@@ -37,7 +37,7 @@ options(DT.options = list(pageLength = 15))
 #set db connection
 #using a pool connection so separate connnections are unified
 #gets environmental variables saved in local or pwdrstudio environment
-poolConn <- dbPool(odbc(), dsn = "mars14_datav2", uid = Sys.getenv("shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
+poolConn <- dbPool(odbc::odbc(), dsn = "mars14_datav2", uid = Sys.getenv("shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
 
 
 #disconnect from db on stop 
@@ -80,7 +80,7 @@ sensor_issue_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_sensor_
 #Sensor Serial Number List
 hobo_list_query <-  "select inv.sensor_serial, inv.sensor_model, inv.date_purchased, 
       ow.smp_id, ow.ow_suffix from fieldwork.viw_inventory_sensors_full inv
-                          left join fieldwork.tbl_deployment d on d.inventory_sensors_uid = inv.inventory_sensors_uid AND d.collection_dtime_est is NULL
+                          left join fieldwork.tbl_deployment d on d.inventory_sensors_uid = inv.inventory_sensors_uid AND d.collection_dtime is NULL
                             left join fieldwork.tbl_ow ow on ow.ow_uid = d.ow_uid"
 hobo_list <- odbc::dbGetQuery(poolConn, hobo_list_query)
 sensor_serial <- hobo_list$sensor_serial
@@ -244,14 +244,14 @@ server <- function(input, output, session) {
   
   rv$history_dt <- reactive(odbc::dbGetQuery(poolConn, history_query) %>%
                               select(sensor_serial, smp_site_name, ow_suffix, type, term,
-                                     deployment_dtime_est, collection_dtime_est,
+                                     deployment_dtime, collection_dtime,
                                      project_name, notes) %>%
-                              dplyr::mutate("Deployment Time" = lubridate::as_date(deployment_dtime_est),
-                                            "Collection Time" = lubridate::as_date(collection_dtime_est)) %>%
+                              dplyr::mutate("Deployment Time" = lubridate::as_date(deployment_dtime),
+                                            "Collection Time" = lubridate::as_date(collection_dtime)) %>%
                               dplyr::filter(sensor_serial == input$serial_no))
   
   rv$sensor_history_display <- reactive(rv$history_dt() %>%
-                                          dplyr::select(-project_name,-deployment_dtime_est,-collection_dtime_est) %>%
+                                          dplyr::select(-project_name,-deployment_dtime,-collection_dtime) %>%
                                           rename("Serial Number" = "sensor_serial",
                                                  "SMP ID/Site Name" = "smp_site_name",
                                                  "Location" = "ow_suffix",
@@ -507,15 +507,6 @@ server <- function(input, output, session) {
     content = function(file){
       write.csv(rv$sensor_table_download(), file, row.names = FALSE)
     }
-  )
-  
-  #2.8 return values ------
-  return(
-    list(
-      refresh_serial_no = reactive(rv$refresh_serial_no),
-      serial_no = reactive(input$serial_no),
-      sensor_serial = reactive(rv$sensor_table$sensor_serial)
-    )
   )
   
   # Add/Edit Sensor Test tab ----
