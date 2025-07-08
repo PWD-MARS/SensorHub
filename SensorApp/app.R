@@ -86,58 +86,118 @@ hobo_list <- odbc::dbGetQuery(poolConn, hobo_list_query)
 sensor_serial <- hobo_list$sensor_serial
 
 
-ui <- tagList(useShinyjs(), navbarPage("Sensor App", id = "TabPanelID", theme = shinytheme("cyborg"),
-                                       tabPanel(title = "Add/Edit Sensor",value = "add_sensor",
-                                                titlePanel("Add Sensor to Inventory or Edit Existing Sensor"),
-                                                #1.1 sidebarPanel-----
-                                                sidebarPanel(
-                                                  tabsetPanel(
-                                                    tabPanel(title = "Add/Edit Sensor",
-                                                             h4("Add/Edit Sensor"),
-                                                             numericInput("serial_no", html_req("Sensor Serial Number"), value = NA),
-                                                             selectInput("model_no", html_req("Sensor Model Number"), choices = c("", sensor_model_lookup$sensor_model),
-                                                                         selected = NULL),
-                                                             dateInput("date_purchased", "Purchase Date", value = as.Date(NA)),
-                                                             selectInput("sensor_status", html_req("Sensor Status"), choices = sensor_status_lookup$sensor_status, selected = "Good Order"),
-                                                             conditionalPanel(width = 12,
-                                                                              condition = 'input.sensor_status != "Good Order" & input.sensor_status != "In Testing"',
-                                          
-                                                                              selectInput("issue_one", html_req("Issue #1"),
-                                                                                          choices = c("", sensor_issue_lookup$sensor_issue), selected = NULL),
-                                                                              selectInput("issue_two", "Issue #2",
-                                                                                          choices = c("", sensor_issue_lookup$sensor_issue), selected = NULL),
-                                                                              checkboxInput("request_data", "Request Data Be Retrieved and Sent to PWD")
-                                                             ),
-                                                             actionButton("add_sensor", "Add Sensor"),
-                                                             actionButton("add_sensor_deploy", "Deploy this Sensor"),
-                                                             actionButton("clear", "Clear Fields")),
-                                                    tabPanel(title = "Download Options",
-                                                             h4("Download Options"),
-                                                             selectInput("sensor_status_dl", "Sensor Statuses to Download", choices = c("All", sensor_status_lookup$sensor_status)),
-                                                             downloadButton("download", "Download Sensor Inventory")),
-                                                    
-                                                    tabPanel(title = "Summary Table",
-                                                             h4("Summary Table Options"),
-                                                             dropdownButton(circle = FALSE, label = "Summary Variables",
-                                                                            tags$style(HTML("#{background-color: #272B30; color: #FFFFFF}")),
-                                                                            checkboxGroupInput(inputId = "sensor_summary_list", label = "Selection",
-                                                                                               choices = c("Model", "Sensor Type", "Sensor Status", "Deployed"),
-                                                                                               tags$style(HTML("background-color: #272B30; color: #FFFFFF")))),
-                                                    )
-                                                  )),
-                                                mainPanel(tabsetPanel(
-                                                  tabPanel("Sensor Status Table",
-                                                           DTOutput("sensor_table")),
-                                                  tabPanel("Sensor Summary Table",
-                                                           DTOutput("sensor_summary_table")),
-                                                  tabPanel("Sensor History Table",
-                                                           DTOutput("sensor_history_table"))
-                                                ))
-                                                
-                                       )
-)
-)
-                                       
+ui <- tagList(useShinyjs(), navbarPage("Sensor App",
+  id = "TabPanelID", theme = shinytheme("cyborg"),
+  tabPanel(
+    title = "Add/Edit Sensor", value = "add_sensor",
+    titlePanel("Add Sensor to Inventory or Edit Existing Sensor"),
+    # 1.1 sidebarPanel-----
+    sidebarPanel(
+      tabsetPanel(
+        tabPanel(
+          title = "Add/Edit Sensor",
+          h4("Add/Edit Sensor"),
+          numericInput("serial_no", html_req("Sensor Serial Number"), value = NA),
+          selectInput("model_no", html_req("Sensor Model Number"),
+            choices = c("", sensor_model_lookup$sensor_model),
+            selected = NULL
+          ),
+          dateInput("date_purchased", "Purchase Date", value = as.Date(NA)),
+          selectInput("sensor_status", html_req("Sensor Status"), choices = sensor_status_lookup$sensor_status, selected = "Good Order"),
+          conditionalPanel(
+            width = 12,
+            condition = 'input.sensor_status != "Good Order" & input.sensor_status != "In Testing"',
+            selectInput("issue_one", html_req("Issue #1"),
+              choices = c("", sensor_issue_lookup$sensor_issue), selected = NULL
+            ),
+            selectInput("issue_two", "Issue #2",
+              choices = c("", sensor_issue_lookup$sensor_issue), selected = NULL
+            ),
+            checkboxInput("request_data", "Request Data Be Retrieved and Sent to PWD")
+          ),
+          actionButton("add_sensor", "Add Sensor"),
+          actionButton("add_sensor_deploy", "Deploy this Sensor"),
+          actionButton("clear", "Clear Fields")
+        ),
+        tabPanel(
+          title = "Download Options",
+          h4("Download Options"),
+          selectInput("sensor_status_dl", "Sensor Statuses to Download", choices = c("All", sensor_status_lookup$sensor_status)),
+          downloadButton("download", "Download Sensor Inventory")
+        ),
+        tabPanel(
+          title = "Summary Table",
+          h4("Summary Table Options"),
+          dropdownButton(
+            circle = FALSE, label = "Summary Variables",
+            tags$style(HTML("#{background-color: #272B30; color: #FFFFFF}")),
+            checkboxGroupInput(
+              inputId = "sensor_summary_list", label = "Selection",
+              choices = c("Model", "Sensor Type", "Sensor Status", "Deployed"),
+              tags$style(HTML("background-color: #272B30; color: #FFFFFF"))
+            )
+          ),
+        )
+      )
+    ),
+    mainPanel(tabsetPanel(
+      tabPanel(
+        "Sensor Status Table",
+        DTOutput("sensor_table")
+      ),
+      tabPanel(
+        "Sensor Summary Table",
+        DTOutput("sensor_summary_table")
+      ),
+      tabPanel(
+        "Sensor History Table",
+        DTOutput("sensor_history_table")
+      )
+    ))
+  ),
+  tabPanel("Add/Edit Sensor Test",
+    value = "test", ## First tab -----
+    sidebarLayout(
+      sidebarPanel(
+        dateInput("date", html_req("Test Date"), value = as.Date(NA)),
+        selectInput("test_type", html_req("Test Type"), choices = c("", "Level", "Baro"), selected = ""),
+        conditionalPanel(
+          condition = "input.test_type == 'Level'",
+          fluidRow(column(
+            6,
+            numericInput("mean_ae_ft", html_req("Mean Absolute Error (ft):"), 0, min = 0, max = 1000),
+          ), column(
+            6,
+            numericInput("max_ae_ft", html_req("Maximum Absolute Error (ft):"), 0, min = 0, max = 1000)
+          ))
+        ),
+        conditionalPanel(
+          condition = "input.test_type == 'Baro'",
+          fluidRow(column(
+            6,
+            numericInput("mean_ae_psi", html_req("Mean Absolute Error (PSI):"), 0, min = 0, max = 1000),
+          ), column(
+            6,
+            numericInput("max_ae_psi", html_req("Maximum Absolute Error (PSI):"), 0, min = 0, max = 1000)
+          ))
+        ),
+        selectInput("sensor_test_status", html_req("Sensor Status"), choices = sensor_status_lookup$sensor_status, selected = "Good Order"),
+        textAreaInput("test_note", "Notes", height = 100)
+      ),
+      mainPanel(
+        reactableOutput("sensor_test_table")
+        
+      )
+    )
+  ),
+  tabPanel("Sensor Testing Calendar",
+    value = "calendar", ## First tab -----
+    sidebarLayout(
+      sidebarPanel(),
+      mainPanel()
+    )
+  )
+))                              
 
 
 # Server -----
@@ -457,6 +517,25 @@ server <- function(input, output, session) {
       sensor_serial = reactive(rv$sensor_table$sensor_serial)
     )
   )
+  
+  # Add/Edit Sensor Test tab ----
+  rv$sensor_tests <- reactive(dbGetQuery(poolConn, "SELECT * FROM fieldwork.tbl_sensor_tests INNER JOIN
+                                         fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid)"))
+  
+  output$sensor_test_table <- renderReactable(
+    reactable(rv$sensor_tests() %>%
+                select("Test Date" = test_date, "Test Type" = test_type),
+              #theme = darkly(),
+              fullWidth = TRUE,
+              selection = "single",
+              searchable = TRUE,
+              onClick = "select",
+              #searchable = TRUE,
+              showPageSizeOptions = TRUE,
+              pageSizeOptions = c(25, 50, 100),
+              defaultPageSize = 25)
+  )
+
   
 }
 
