@@ -20,6 +20,8 @@ library(lubridate)
 library(shinyjs)
 #dropdownButton() for summary table in sensors tab
 library(shinyWidgets)
+#themes
+library(reactablefmtr)
 #accordions to improve sidebars
 library(bslib)
 #DT for datatables
@@ -525,7 +527,7 @@ server <- function(input, output, session) {
   output$sensor_test_table <- renderReactable(
     reactable(rv$sensor_tests() %>%
                 select("Test Date" = test_date, "Test Type" = test_type),
-              #theme = darkly(),
+              theme = darkly(),
               fullWidth = TRUE,
               selection = "single",
               searchable = TRUE,
