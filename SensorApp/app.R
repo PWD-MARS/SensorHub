@@ -170,6 +170,7 @@ ui <- tagList(useShinyjs(), navbarPage("Sensor App",
     value = "test", ## First tab -----
     sidebarLayout(
       sidebarPanel(
+        selectInput("sensor_sn", html_req("Sensor Serial Number"), choices = c("", sort(sensor_serial)), selected = ""),
         dateInput("date", html_req("Test Date"), value = as.Date(NA)),
         selectInput("test_type", html_req("Test Type"), choices = c("", "Level", "Baro"), selected = ""),
         conditionalPanel(
@@ -192,8 +193,10 @@ ui <- tagList(useShinyjs(), navbarPage("Sensor App",
             numericInput("max_ae_psi", html_req("Maximum Absolute Error (PSI):"), 0, min = 0, max = 1000)
           ))
         ),
-        selectInput("sensor_test_status", html_req("Sensor Status"), choices = sensor_status_lookup$sensor_status, selected = "Good Order"),
-        textAreaInput("test_note", "Notes", height = 100)
+        selectInput("sensor_test_status", html_req("Sensor Status"), choices = c("", sensor_status_lookup$sensor_status), selected = ""),
+        textAreaInput("test_note", "Notes", height = 100),
+        actionButton("add_update", "Add/Update"),
+        actionButton("clear_edit", "Clear All Fields")
       ),
       mainPanel(
         reactableOutput("sensor_test_table")
@@ -521,12 +524,17 @@ server <- function(input, output, session) {
   )
   
   # Add/Edit Sensor Test tab ----
-  rv$sensor_tests <- reactive(dbGetQuery(poolConn, "SELECT * FROM fieldwork.tbl_sensor_tests INNER JOIN
-                                         fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid)"))
+  # row references 
+  rv$sensor_test_table_row <- reactive(getReactableState("sensor_test_table", "selected"))
+  
+  rv$sensor_tests <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
+                                         fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) INNER JOIN
+                                         fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)"))
+  
   
   output$sensor_test_table <- renderReactable(
     reactable(rv$sensor_tests() %>%
-                select("Test Date" = test_date, "Test Type" = test_type),
+                select("Serial No" = sensor_serial, "Model" = sensor_model, "Purchase Date" = date_purchased_asdate, "Test Date" = test_date, "Test Type" = test_type, "Mean Absolute Error (ft)"= mean_abs_error_ft, "Max Absolute Error (ft)" = max_abs_error_ft, "Mean Absolute Error (PSI)" = mean_abs_error_psi, "Max Absolute Error (PSI)" = max_abs_error_psi, Status = sensor_status),
               theme = darkly(),
               fullWidth = TRUE,
               selection = "single",
@@ -535,9 +543,65 @@ server <- function(input, output, session) {
               #searchable = TRUE,
               showPageSizeOptions = TRUE,
               pageSizeOptions = c(25, 50, 100),
-              defaultPageSize = 25)
+              defaultPageSize = 25,
+              details = function(index) {
+                nested_notes <- rv$sensor_tests()[index, ] %>%
+                  select(Notes = notes)
+                htmltools::div(
+                  style = "padding: 1rem",
+                  reactable(
+                    nested_notes,
+                    theme = darkly(),
+                    outlined = TRUE
+                  )
+                )
+              }),
+              
   )
-
+  
+  
+  # Update sidebar with clicking a row
+  # select an closed issue row
+  observeEvent(rv$sensor_test_table_row(), {
+    updateSelectInput(session, "sensor_sn", selected = rv$sensor_tests()$sensor_serial[rv$sensor_test_table_row()])
+    updateSelectInput(session, "date", selected = rv$sensor_tests()$test_date[rv$sensor_test_table_row()])
+    updateSelectInput(session, "test_type", selected = rv$sensor_tests()$test_type[rv$sensor_test_table_row()])
+    updateSelectInput(session, "mean_ae_ft", selected = rv$sensor_tests()$mean_abs_error_ft[rv$sensor_test_table_row()])
+    updateSelectInput(session, "max_ae_ft", selected = rv$sensor_tests()$max_abs_error_ft[rv$sensor_test_table_row()])
+    delay(100 ,updateSelectInput(session, "mean_ae_psi", selected = rv$sensor_tests()$mean_abs_error_psi[rv$sensor_test_table_row()]))
+    delay(100 ,updateSelectInput(session, "max_ae_psi", selected = rv$sensor_tests()$max_abs_error_psi[rv$sensor_test_table_row()]))
+    updateTextAreaInput(session, "test_note", value = rv$sensor_tests()$notes[rv$sensor_test_table_row()])
+    updateSelectInput(session, "sensor_status", selected = rv$sensor_tests()$sensor_status[rv$sensor_test_table_row()])
+    
+    
+  }
+  )
+  
+  # clear
+  observeEvent(input$clear_edit, {
+    showModal(modalDialog(title = "Clear All Fields", 
+                          "Are you sure you want to clear all fields on this tab?", 
+                          modalButton("No"), 
+                          actionButton("confirm_clear_edit_pcs", "Yes")))
+  })
+  
+  observeEvent(input$confirm_clear_edit_pcs, {
+    reset("sensor_sn")
+    reset("date")
+    reset("test_type")
+    reset("mean_ae_ft")
+    reset("max_ae_ft")
+    reset("mean_ae_psi")
+    reset("max_ae_psi")
+    reset("test_note")
+    reset("sensor_status")
+    
+    
+    removeModal()
+  })
+  
+  
+  
   
 }
 
