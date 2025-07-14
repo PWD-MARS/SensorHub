@@ -10,6 +10,8 @@ library(shiny)
 library(pool)
 #odbc for database connections
 library(odbc)
+#DBI
+library(DBI)
 #tidyverse for data manipulations
 library(tidyverse)
 #shinythemes for colors
@@ -137,7 +139,7 @@ ui <- tagList(useShinyjs(), navbarPage("Sensor App",
             checkboxInput("request_data", "Request Data Be Retrieved and Sent to PWD")
           ),
           actionButton("add_sensor", "Add Sensor"),
-          actionButton("add_sensor_deploy", "Deploy this Sensor"),
+          # actionButton("add_sensor_deploy", "Deploy this Sensor"),
           actionButton("clear", "Clear Fields")
         ),
         tabPanel(
@@ -403,7 +405,7 @@ server <- function(input, output, session) {
   #2.4 toggle states/labels -----
   #enable/disable the "add sensor button" if all fields are not empty
   observe({toggleState(id = "add_sensor", condition = nchar(input$serial_no) > 0 & nchar(input$model_no) > 0)})
-  observe({toggleState(id = "add_sensor_deploy", input$serial_no %in% rv$sensor_table$sensor_serial)})
+  # observe({toggleState(id = "add_sensor_deploy", input$serial_no %in% rv$sensor_table$sensor_serial)})
   
   #enable/disable issue #2 button if issue #1 is filled
   observe(toggleState(id = "issue_two", condition = nchar(input$issue_one) > 0))
@@ -490,11 +492,11 @@ server <- function(input, output, session) {
   })
   
   #switch tabs to "Deploy" and update Sensor ID to the current Sensor ID (if the add/edit button says edit sensor)
-  rv$refresh_serial_no <- 0 
-  observeEvent(input$add_sensor_deploy, {
-    rv$refresh_serial_no <- rv$refresh_serial_no + 1
-    updateTabsetPanel(session = parent_session, "inTabset", selected = "deploy_tab")
-  })
+  # rv$refresh_serial_no <- 0 
+  # observeEvent(input$add_sensor_deploy, {
+  #   rv$refresh_serial_no <- rv$refresh_serial_no + 1
+  #   updateTabsetPanel(session = parent_session, "inTabset", selected = "deploy_tab")
+  # })
   
   #2.6 clear fields ----
   #clear all fields
@@ -548,12 +550,14 @@ server <- function(input, output, session) {
   
   rv$sensor_tests <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
                                          fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) INNER JOIN
-                                         fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)"))
+                                         fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)") %>%
+                                dplyr::filter(sensor_serial == input$sensor_sn) 
+  )
   
   
   #add/edit button toggle
-  rv$label <- reactive(if(!is.null(rv$sensor_test_table_row())) "Edit Selected" else "Add New")
-  observe(updateActionButton(session, "add_update", label = rv$label()))
+  rv$label_test <- reactive(if(!is.null(rv$sensor_test_table_row())) "Edit Selected" else "Add New")
+  observe(updateActionButton(session, "add_update", label = rv$label_test()))
   
   output$sensor_test_table <- renderReactable(
     reactable(rv$sensor_tests() %>%
@@ -663,7 +667,8 @@ server <- function(input, output, session) {
       # Reload and reset
       rv$sensor_tests <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
                                          fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) INNER JOIN
-                                         fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)"))
+                                         fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)") %>%
+                                         dplyr::filter(sensor_serial == input$sensor_sn))
       reset("date")
       reset("test_type")
       reset("mean_ae_ft")
@@ -717,7 +722,8 @@ server <- function(input, output, session) {
       # Reload and reset
       rv$sensor_tests <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
                                                                 fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) INNER JOIN
-                                                                fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)"))
+                                                                fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)") %>%
+                                                                dplyr::filter(sensor_serial == input$sensor_sn))
       reset("date")
       reset("test_type")
       reset("mean_ae_ft")
