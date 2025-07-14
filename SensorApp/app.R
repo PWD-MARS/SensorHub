@@ -81,6 +81,16 @@ jsColCode <- 'shinyjs.backgroundCol = function(params) {
                   el.css("background-color", params.col);
                   }'
 
+# #replace special characters with friendlier characters
+special_char_replace <- function(note){
+  
+  note_fix <- note %>%
+    str_replace_all(c("•" = "-", "ï‚§" = "-", "“" = '"', '”' = '"'))
+  
+  return(note_fix)
+  
+}
+
 #Sensor Model Number options
 sensor_model_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_sensor_model_lookup order by sensor_model_lookup_uid")
 
@@ -89,7 +99,7 @@ sensor_status_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_sensor
 sensor_issue_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_sensor_issue_lookup order by sensor_issue_lookup_uid")
 
 #Sensor Serial Number List
-hobo_list_query <-  "select inv.sensor_serial, inv.sensor_model, inv.date_purchased, 
+hobo_list_query <-  "select inv.inventory_sensors_uid, inv.sensor_serial, inv.sensor_model, inv.date_purchased, 
       ow.smp_id, ow.ow_suffix from fieldwork.viw_inventory_sensors_full inv
                           left join fieldwork.tbl_deployment d on d.inventory_sensors_uid = inv.inventory_sensors_uid AND d.collection_dtime is NULL
                             left join fieldwork.tbl_ow ow on ow.ow_uid = d.ow_uid"
@@ -195,7 +205,7 @@ ui <- tagList(useShinyjs(), navbarPage("Sensor App",
         ),
         selectInput("sensor_test_status", html_req("Sensor Status"), choices = c("", sensor_status_lookup$sensor_status), selected = ""),
         textAreaInput("test_note", "Notes", height = 100),
-        actionButton("add_update", "Add/Update"),
+        actionButton("add_update", "Add New"),
         actionButton("clear_edit", "Clear All Fields")
       ),
       mainPanel(
@@ -523,7 +533,16 @@ server <- function(input, output, session) {
     }
   )
   
-  # Add/Edit Sensor Test tab ----
+  # 3.0 Add/Edit Sensor Test tab ----
+  # toggle submit button
+  observe(toggleState(id = "add_update", input$sensor_sn != ""
+                      & length(input$date) > 0
+                      & input$test_type != ""
+                      & ifelse(input$test_type == "Level", is.numeric(input$mean_ae_ft) & is.numeric(input$max_ae_ft), 
+                               is.numeric(input$mean_ae_psi) & is.numeric(input$max_ae_psi))
+                      & input$sensor_test_status != ""
+  ))
+  
   # row references 
   rv$sensor_test_table_row <- reactive(getReactableState("sensor_test_table", "selected"))
   
@@ -531,6 +550,10 @@ server <- function(input, output, session) {
                                          fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) INNER JOIN
                                          fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)"))
   
+  
+  #add/edit button toggle
+  rv$label <- reactive(if(!is.null(rv$sensor_test_table_row())) "Edit Selected" else "Add New")
+  observe(updateActionButton(session, "add_update", label = rv$label()))
   
   output$sensor_test_table <- renderReactable(
     reactable(rv$sensor_tests() %>%
@@ -571,7 +594,7 @@ server <- function(input, output, session) {
     delay(100 ,updateSelectInput(session, "mean_ae_psi", selected = rv$sensor_tests()$mean_abs_error_psi[rv$sensor_test_table_row()]))
     delay(100 ,updateSelectInput(session, "max_ae_psi", selected = rv$sensor_tests()$max_abs_error_psi[rv$sensor_test_table_row()]))
     updateTextAreaInput(session, "test_note", value = rv$sensor_tests()$notes[rv$sensor_test_table_row()])
-    updateSelectInput(session, "sensor_status", selected = rv$sensor_tests()$sensor_status[rv$sensor_test_table_row()])
+    updateSelectInput(session, "sensor_test_status", selected = rv$sensor_tests()$sensor_status[rv$sensor_test_table_row()])
     
     
   }
@@ -594,15 +617,120 @@ server <- function(input, output, session) {
     reset("mean_ae_psi")
     reset("max_ae_psi")
     reset("test_note")
-    reset("sensor_status")
+    reset("sensor_test_status")
     
     
     removeModal()
   })
-  
-  
-  
-  
+
+  # On click "submit_btn"
+  observeEvent(input$add_update, {
+    #process text field to prevent sql injection
+    rv$test_note <- reactive(gsub('\'', '\'\'',  input$test_note))
+    rv$test_note_trimmed  <- reactive(special_char_replace(rv$test_note()))
+    
+    
+    inv_uid <- hobo_list %>%
+      dplyr::filter(sensor_serial == input$sensor_sn) %>%
+      dplyr::select(inventory_sensors_uid) %>%
+      dplyr::pull()
+
+
+    if (is.null(rv$sensor_test_table_row())) {
+      new_test_df <- data.frame(
+        test_date = input$date,
+        test_type_lookup_uid = ifelse(input$test_type == "Level", 1, 2),
+        mean_abs_error_ft = ifelse(input$test_type == "Level", input$mean_ae_ft, NA),
+        max_abs_error_ft = ifelse(input$test_type == "Level", input$max_ae_ft, NA),
+        mean_abs_error_psi = ifelse(input$test_type == "Baro", input$mean_ae_psi, NA),
+        max_abs_error_psi = ifelse(input$test_type == "Baro", input$max_ae_psi, NA),
+        notes = rv$test_note_trimmed(),
+        inventory_sensors_uid = inv_uid
+      )
+
+      odbc::dbWriteTable(poolConn, Id(schema = "fieldwork", table = "tbl_sensor_tests"), new_test_df, append = TRUE, row.names = FALSE)
+
+      sensor_status_lookup_uid <- sensor_status_lookup %>%
+        dplyr::filter(sensor_status == input$sensor_test_status) %>%
+        dplyr::select(sensor_status_lookup_uid) %>%
+        dplyr::pull()
+
+      edt_sensor_status_q <- paste("Update fieldwork.tbl_inventory_sensors SET sensor_status_lookup_uid = ", sensor_status_lookup_uid, " where inventory_sensors_uid = ", inv_uid, sep = "")
+
+      odbc::dbGetQuery(poolConn, edt_sensor_status_q)
+
+
+      # Reload and reset
+      rv$sensor_tests <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
+                                         fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) INNER JOIN
+                                         fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)"))
+      reset("date")
+      reset("test_type")
+      reset("mean_ae_ft")
+      reset("max_ae_ft")
+      reset("mean_ae_psi")
+      reset("max_ae_psi")
+      reset("test_note")
+      reset("sensor_test_status")
+
+      # update other tabs
+      rv$sensor_table <- odbc::dbGetQuery(poolConn, sensor_table_query)
+    } else {
+      
+      inv_uid <- hobo_list %>%
+        dplyr::filter(sensor_serial == input$sensor_sn) %>%
+        dplyr::select(inventory_sensors_uid) %>%
+        dplyr::pull()
+
+      sensor_status_lookup_uid <- sensor_status_lookup %>%
+        dplyr::filter(sensor_status == input$sensor_test_status) %>%
+        dplyr::select(sensor_status_lookup_uid) %>%
+        dplyr::pull()
+
+      edt_sensor_test_q <- paste0("Update fieldwork.tbl_sensor_tests SET test_date = '",
+        input$date,
+        "', test_type_lookup_uid = ",
+        ifelse(input$test_type == "Level", 1, 2),
+        ", mean_abs_error_ft = ",
+        ifelse(input$test_type == "Level", input$mean_ae_ft, "NULL"),
+        ", max_abs_error_ft = ",
+        ifelse(input$test_type == "Level", input$max_ae_ft, "NULL"),
+        ", mean_abs_error_psi = ",
+        ifelse(input$test_type == "Baro", input$mean_ae_psi, "NULL"),
+        ", max_abs_error_psi = ",
+        ifelse(input$test_type == "Baro", input$max_ae_psi, "NULL"),
+        ", notes = '",
+        rv$test_note_trimmed(),
+        "' ",
+        "where sensor_tests_uid = ",
+        rv$sensor_tests()$sensor_tests_uid[rv$sensor_test_table_row()],
+        sep = ""
+      )
+
+      odbc::dbGetQuery(poolConn, edt_sensor_test_q)
+
+      # status update
+      edt_sensor_status_qq <- paste("Update fieldwork.tbl_inventory_sensors SET sensor_status_lookup_uid = ", sensor_status_lookup_uid, " where inventory_sensors_uid = ", inv_uid, sep = "")
+
+      odbc::dbGetQuery(poolConn, edt_sensor_status_qq)
+
+      # Reload and reset
+      rv$sensor_tests <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
+                                                                fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) INNER JOIN
+                                                                fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)"))
+      reset("date")
+      reset("test_type")
+      reset("mean_ae_ft")
+      reset("max_ae_ft")
+      reset("mean_ae_psi")
+      reset("max_ae_psi")
+      reset("test_note")
+      reset("sensor_test_status")
+
+      # update other tab
+      rv$sensor_table <- odbc::dbGetQuery(poolConn, sensor_table_query)
+    }
+  })
 }
 
 
