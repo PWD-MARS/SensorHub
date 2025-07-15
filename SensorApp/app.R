@@ -664,6 +664,12 @@ server <- function(input, output, session) {
                                          fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) INNER JOIN
                                          fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)") %>%
        dplyr::filter(sensor_serial == input$sensor_sn))
+     
+     
+     # update calendar
+     rv$cal_table <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
+                                                                fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) RIGHT JOIN
+                                                                fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)"))
      reset("date")
      reset("test_type")
      reset("mean_ae_ft")
@@ -718,6 +724,11 @@ server <- function(input, output, session) {
                                                                 fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) INNER JOIN
                                                                 fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)") %>%
        dplyr::filter(sensor_serial == input$sensor_sn))
+     
+     # update calendar
+     rv$cal_table <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
+                                                                fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) RIGHT JOIN
+                                                                fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)"))
      reset("date")
      reset("test_type")
      reset("mean_ae_ft")
@@ -737,20 +748,20 @@ server <- function(input, output, session) {
  rv$calendar_display_row <- reactive(getReactableState("calendar_display", "selected"))
 
  # Sensor Testing Calendar tab -----
- cal_table <- dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
+ rv$cal_table <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
                                                                 fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) RIGHT JOIN
-                                                                fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)")
+                                                                fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)"))
 
- cal_table_display <- cal_table %>%
+ rv$cal_table_display <- reactive(rv$cal_table() %>%
    group_by(sensor_serial) %>%
    slice_max(order_by = test_date, with_ties = FALSE) %>%
    ungroup() %>%
    dplyr::arrange(test_date) %>%
-   dplyr::mutate(testing_deadline = data.table::fifelse(is.na(test_date), NA, test_date + lubridate::years(2)))
+   dplyr::mutate(testing_deadline = data.table::fifelse(is.na(test_date), NA, test_date + lubridate::years(2))))
 
  output$calendar_display <- renderReactable(
    reactable(
-     cal_table_display %>%
+     rv$cal_table_display() %>%
        dplyr::select("Serial Number" = sensor_serial, "Model Number" = sensor_model, "Purchase Date" = date_purchased_asdate, "Sensor Status" = sensor_status, "SMP ID" = smp_id, "OW SUffix" = ow_suffix, "Test Type" = test_type, "Latest Test Date" = test_date, "Testing Deadline" = testing_deadline),
      theme = darkly(),
      fullWidth = TRUE,
@@ -780,7 +791,7 @@ server <- function(input, output, session) {
  # switch tabs
  observeEvent(rv$calendar_display_row(), {
    updateTabsetPanel(session, "TabPanelID", selected = "test")
-   updateSelectInput(session, "sensor_sn", selected = cal_table_display$sensor_serial[rv$calendar_display_row()])
+   updateSelectInput(session, "sensor_sn", selected = rv$cal_table_display()$sensor_serial[rv$calendar_display_row()])
  })
 }
 
