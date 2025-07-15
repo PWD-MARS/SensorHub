@@ -218,10 +218,7 @@ ui <- tagList(useShinyjs(), navbarPage("Sensor App",
   ),
   tabPanel("Sensor Testing Calendar",
     value = "calendar", ## First tab -----
-    sidebarLayout(
-      sidebarPanel(),
-      mainPanel(reactableOutput("calendar_display"))
-    )
+    reactableOutput("calendar_display")
   )
 ))                              
 
@@ -748,7 +745,7 @@ server <- function(input, output, session) {
    group_by(sensor_serial) %>%
    slice_max(order_by = test_date, with_ties = FALSE) %>%
    ungroup() %>%
-   dplyr::arrange(desc(test_date)) %>%
+   dplyr::arrange(test_date) %>%
    dplyr::mutate(testing_deadline = data.table::fifelse(is.na(test_date), NA, test_date + lubridate::years(2)))
 
  output$calendar_display <- renderReactable(
@@ -763,7 +760,20 @@ server <- function(input, output, session) {
      # searchable = TRUE,
      showPageSizeOptions = TRUE,
      pageSizeOptions = c(25, 50, 100),
-     defaultPageSize = 25
+     defaultPageSize = 25,
+     columns = list("Testing Deadline" = colDef(
+       style = function(value) {
+         if (is.na(value)) {
+           # don't color code NAs
+         } else if (as.numeric(value - Sys.Date()) < 93 & as.numeric(value - Sys.Date()) > 0) {
+           return(list(background = "orange", color = "black", fontweight = "bold"))
+         } else if (as.numeric(value - Sys.Date()) < 1) {
+           return(list(background = "#A70D2A", color = "white", fontweight = "bold"))
+         } else {
+           # don't color code other dates
+         }
+       }
+     ))
    ),
  )
 
