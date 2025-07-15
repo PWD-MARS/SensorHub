@@ -513,7 +513,6 @@ server <- function(input, output, session) {
     removeModal()
   })
   
-  
   #2.7 download ----
   #downloading the sensor table
   #filter based on selected status
@@ -532,267 +531,261 @@ server <- function(input, output, session) {
     }
   )
   # 3.0 Add/Edit Sensor Test tab ----
- # toggle submit button
- observe(toggleState(id = "add_update", input$sensor_sn != "" &
-   length(input$date) > 0 &
-   input$test_type != "" &
-   ifelse(input$test_type == "Level", is.numeric(input$mean_ae_ft) & is.numeric(input$max_ae_ft),
-     is.numeric(input$mean_ae_psi) & is.numeric(input$max_ae_psi)
-   ) &
-   input$sensor_test_status != ""))
+  # toggle submit button
+  observe(toggleState(id = "add_update", input$sensor_sn != "" &
+    length(input$date) > 0 &
+    input$test_type != "" &
+    ifelse(input$test_type == "Level", is.numeric(input$mean_ae_ft) & is.numeric(input$max_ae_ft),
+      is.numeric(input$mean_ae_psi) & is.numeric(input$max_ae_psi)
+    ) &
+    input$sensor_test_status != ""))
 
- # row references
- rv$sensor_test_table_row <- reactive(getReactableState("sensor_test_table", "selected"))
+  # row references
+  rv$sensor_test_table_row <- reactive(getReactableState("sensor_test_table", "selected"))
 
- rv$sensor_tests <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
+  rv$sensor_tests <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
                                          fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) INNER JOIN
                                          fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)") %>%
-   dplyr::filter(sensor_serial == input$sensor_sn))
+    dplyr::filter(sensor_serial == input$sensor_sn))
+
+  # add/edit button toggle
+  rv$label_test <- reactive(if (!is.null(rv$sensor_test_table_row())) "Edit Selected" else "Add New")
+  observe(updateActionButton(session, "add_update", label = rv$label_test()))
+
+  output$sensor_test_table <- renderReactable(
+    reactable(
+      rv$sensor_tests() %>%
+        select("Serial No" = sensor_serial, "Model" = sensor_model, "Purchase Date" = date_purchased_asdate, "Test Date" = test_date, "Test Type" = test_type, "Mean Absolute Error (ft)" = mean_abs_error_ft, "Max Absolute Error (ft)" = max_abs_error_ft, "Mean Absolute Error (PSI)" = mean_abs_error_psi, "Max Absolute Error (PSI)" = max_abs_error_psi, Status = sensor_status),
+      theme = darkly(),
+      fullWidth = TRUE,
+      selection = "single",
+      searchable = TRUE,
+      onClick = "select",
+      # searchable = TRUE,
+      showPageSizeOptions = TRUE,
+      pageSizeOptions = c(25, 50, 100),
+      defaultPageSize = 25,
+      details = function(index) {
+        nested_notes <- rv$sensor_tests()[index, ] %>%
+          select(Notes = notes)
+        htmltools::div(
+          style = "padding: 1rem",
+          reactable(
+            nested_notes,
+            theme = darkly(),
+            outlined = TRUE
+          )
+        )
+      }
+    ),
+  )
+
+  # Update sidebar with clicking a row
+  # select an closed issue row
+  observeEvent(rv$sensor_test_table_row(), {
+    updateSelectInput(session, "sensor_sn", selected = rv$sensor_tests()$sensor_serial[rv$sensor_test_table_row()])
+    updateSelectInput(session, "date", selected = rv$sensor_tests()$test_date[rv$sensor_test_table_row()])
+    updateSelectInput(session, "test_type", selected = rv$sensor_tests()$test_type[rv$sensor_test_table_row()])
+    updateSelectInput(session, "mean_ae_ft", selected = rv$sensor_tests()$mean_abs_error_ft[rv$sensor_test_table_row()])
+    updateSelectInput(session, "max_ae_ft", selected = rv$sensor_tests()$max_abs_error_ft[rv$sensor_test_table_row()])
+    delay(100, updateSelectInput(session, "mean_ae_psi", selected = rv$sensor_tests()$mean_abs_error_psi[rv$sensor_test_table_row()]))
+    delay(100, updateSelectInput(session, "max_ae_psi", selected = rv$sensor_tests()$max_abs_error_psi[rv$sensor_test_table_row()]))
+    updateTextAreaInput(session, "test_note", value = rv$sensor_tests()$notes[rv$sensor_test_table_row()])
+    updateSelectInput(session, "sensor_test_status", selected = rv$sensor_tests()$sensor_status[rv$sensor_test_table_row()])
+  })
+
+  # clear
+  observeEvent(input$clear_edit, {
+    showModal(modalDialog(
+      title = "Clear All Fields",
+      "Are you sure you want to clear all fields on this tab?",
+      modalButton("No"),
+      actionButton("confirm_clear_edit_pcs", "Yes")
+    ))
+  })
+
+  observeEvent(input$confirm_clear_edit_pcs, {
+    reset("sensor_sn")
+    reset("date")
+    reset("test_type")
+    reset("mean_ae_ft")
+    reset("max_ae_ft")
+    reset("mean_ae_psi")
+    reset("max_ae_psi")
+    reset("test_note")
+    reset("sensor_test_status")
 
 
- # add/edit button toggle
- rv$label_test <- reactive(if (!is.null(rv$sensor_test_table_row())) "Edit Selected" else "Add New")
- observe(updateActionButton(session, "add_update", label = rv$label_test()))
+    removeModal()
+  })
 
- output$sensor_test_table <- renderReactable(
-   reactable(
-     rv$sensor_tests() %>%
-       select("Serial No" = sensor_serial, "Model" = sensor_model, "Purchase Date" = date_purchased_asdate, "Test Date" = test_date, "Test Type" = test_type, "Mean Absolute Error (ft)" = mean_abs_error_ft, "Max Absolute Error (ft)" = max_abs_error_ft, "Mean Absolute Error (PSI)" = mean_abs_error_psi, "Max Absolute Error (PSI)" = max_abs_error_psi, Status = sensor_status),
-     theme = darkly(),
-     fullWidth = TRUE,
-     selection = "single",
-     searchable = TRUE,
-     onClick = "select",
-     # searchable = TRUE,
-     showPageSizeOptions = TRUE,
-     pageSizeOptions = c(25, 50, 100),
-     defaultPageSize = 25,
-     details = function(index) {
-       nested_notes <- rv$sensor_tests()[index, ] %>%
-         select(Notes = notes)
-       htmltools::div(
-         style = "padding: 1rem",
-         reactable(
-           nested_notes,
-           theme = darkly(),
-           outlined = TRUE
-         )
-       )
-     }
-   ),
- )
+  # On click "submit_btn"
+  observeEvent(input$add_update, {
+    # process text field to prevent sql injection
+    rv$test_note <- reactive(gsub("'", "''", input$test_note))
+    rv$test_note_trimmed <- reactive(special_char_replace(rv$test_note()))
+
+    inv_uid <- hobo_list %>%
+      dplyr::filter(sensor_serial == input$sensor_sn) %>%
+      dplyr::select(inventory_sensors_uid) %>%
+      dplyr::pull()
 
 
- # Update sidebar with clicking a row
- # select an closed issue row
- observeEvent(rv$sensor_test_table_row(), {
-   updateSelectInput(session, "sensor_sn", selected = rv$sensor_tests()$sensor_serial[rv$sensor_test_table_row()])
-   updateSelectInput(session, "date", selected = rv$sensor_tests()$test_date[rv$sensor_test_table_row()])
-   updateSelectInput(session, "test_type", selected = rv$sensor_tests()$test_type[rv$sensor_test_table_row()])
-   updateSelectInput(session, "mean_ae_ft", selected = rv$sensor_tests()$mean_abs_error_ft[rv$sensor_test_table_row()])
-   updateSelectInput(session, "max_ae_ft", selected = rv$sensor_tests()$max_abs_error_ft[rv$sensor_test_table_row()])
-   delay(100, updateSelectInput(session, "mean_ae_psi", selected = rv$sensor_tests()$mean_abs_error_psi[rv$sensor_test_table_row()]))
-   delay(100, updateSelectInput(session, "max_ae_psi", selected = rv$sensor_tests()$max_abs_error_psi[rv$sensor_test_table_row()]))
-   updateTextAreaInput(session, "test_note", value = rv$sensor_tests()$notes[rv$sensor_test_table_row()])
-   updateSelectInput(session, "sensor_test_status", selected = rv$sensor_tests()$sensor_status[rv$sensor_test_table_row()])
- })
+    if (is.null(rv$sensor_test_table_row())) {
+      new_test_df <- data.frame(
+        test_date = input$date,
+        test_type_lookup_uid = ifelse(input$test_type == "Level", 1, 2),
+        mean_abs_error_ft = ifelse(input$test_type == "Level", input$mean_ae_ft, NA),
+        max_abs_error_ft = ifelse(input$test_type == "Level", input$max_ae_ft, NA),
+        mean_abs_error_psi = ifelse(input$test_type == "Baro", input$mean_ae_psi, NA),
+        max_abs_error_psi = ifelse(input$test_type == "Baro", input$max_ae_psi, NA),
+        notes = rv$test_note_trimmed(),
+        inventory_sensors_uid = inv_uid
+      )
 
- # clear
- observeEvent(input$clear_edit, {
-   showModal(modalDialog(
-     title = "Clear All Fields",
-     "Are you sure you want to clear all fields on this tab?",
-     modalButton("No"),
-     actionButton("confirm_clear_edit_pcs", "Yes")
-   ))
- })
+      odbc::dbWriteTable(poolConn, Id(schema = "fieldwork", table = "tbl_sensor_tests"), new_test_df, append = TRUE, row.names = FALSE)
 
- observeEvent(input$confirm_clear_edit_pcs, {
-   reset("sensor_sn")
-   reset("date")
-   reset("test_type")
-   reset("mean_ae_ft")
-   reset("max_ae_ft")
-   reset("mean_ae_psi")
-   reset("max_ae_psi")
-   reset("test_note")
-   reset("sensor_test_status")
+      sensor_status_lookup_uid <- sensor_status_lookup %>%
+        dplyr::filter(sensor_status == input$sensor_test_status) %>%
+        dplyr::select(sensor_status_lookup_uid) %>%
+        dplyr::pull()
 
+      edt_sensor_status_q <- paste("Update fieldwork.tbl_inventory_sensors SET sensor_status_lookup_uid = ", sensor_status_lookup_uid, " where inventory_sensors_uid = ", inv_uid, sep = "")
 
-   removeModal()
- })
+      odbc::dbGetQuery(poolConn, edt_sensor_status_q)
 
- # On click "submit_btn"
- observeEvent(input$add_update, {
-   # process text field to prevent sql injection
-   rv$test_note <- reactive(gsub("'", "''", input$test_note))
-   rv$test_note_trimmed <- reactive(special_char_replace(rv$test_note()))
-
-
-   inv_uid <- hobo_list %>%
-     dplyr::filter(sensor_serial == input$sensor_sn) %>%
-     dplyr::select(inventory_sensors_uid) %>%
-     dplyr::pull()
-
-
-   if (is.null(rv$sensor_test_table_row())) {
-     new_test_df <- data.frame(
-       test_date = input$date,
-       test_type_lookup_uid = ifelse(input$test_type == "Level", 1, 2),
-       mean_abs_error_ft = ifelse(input$test_type == "Level", input$mean_ae_ft, NA),
-       max_abs_error_ft = ifelse(input$test_type == "Level", input$max_ae_ft, NA),
-       mean_abs_error_psi = ifelse(input$test_type == "Baro", input$mean_ae_psi, NA),
-       max_abs_error_psi = ifelse(input$test_type == "Baro", input$max_ae_psi, NA),
-       notes = rv$test_note_trimmed(),
-       inventory_sensors_uid = inv_uid
-     )
-
-     odbc::dbWriteTable(poolConn, Id(schema = "fieldwork", table = "tbl_sensor_tests"), new_test_df, append = TRUE, row.names = FALSE)
-
-     sensor_status_lookup_uid <- sensor_status_lookup %>%
-       dplyr::filter(sensor_status == input$sensor_test_status) %>%
-       dplyr::select(sensor_status_lookup_uid) %>%
-       dplyr::pull()
-
-     edt_sensor_status_q <- paste("Update fieldwork.tbl_inventory_sensors SET sensor_status_lookup_uid = ", sensor_status_lookup_uid, " where inventory_sensors_uid = ", inv_uid, sep = "")
-
-     odbc::dbGetQuery(poolConn, edt_sensor_status_q)
-
-
-     # Reload and reset
-     rv$sensor_tests <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
+      # Reload and reset
+      rv$sensor_tests <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
                                          fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) INNER JOIN
                                          fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)") %>%
-       dplyr::filter(sensor_serial == input$sensor_sn))
-     
-     
-     # update calendar
-     rv$cal_table <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
+        dplyr::filter(sensor_serial == input$sensor_sn))
+
+
+      # update calendar
+      rv$cal_table <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
                                                                 fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) RIGHT JOIN
                                                                 fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)"))
-     reset("date")
-     reset("test_type")
-     reset("mean_ae_ft")
-     reset("max_ae_ft")
-     reset("mean_ae_psi")
-     reset("max_ae_psi")
-     reset("test_note")
-     reset("sensor_test_status")
+      reset("date")
+      reset("test_type")
+      reset("mean_ae_ft")
+      reset("max_ae_ft")
+      reset("mean_ae_psi")
+      reset("max_ae_psi")
+      reset("test_note")
+      reset("sensor_test_status")
 
-     # update other tabs
-     rv$sensor_table <- odbc::dbGetQuery(poolConn, sensor_table_query)
-   } else {
-     inv_uid <- hobo_list %>%
-       dplyr::filter(sensor_serial == input$sensor_sn) %>%
-       dplyr::select(inventory_sensors_uid) %>%
-       dplyr::pull()
+      # update other tabs
+      rv$sensor_table <- odbc::dbGetQuery(poolConn, sensor_table_query)
+    } else {
+      inv_uid <- hobo_list %>%
+        dplyr::filter(sensor_serial == input$sensor_sn) %>%
+        dplyr::select(inventory_sensors_uid) %>%
+        dplyr::pull()
 
-     sensor_status_lookup_uid <- sensor_status_lookup %>%
-       dplyr::filter(sensor_status == input$sensor_test_status) %>%
-       dplyr::select(sensor_status_lookup_uid) %>%
-       dplyr::pull()
+      sensor_status_lookup_uid <- sensor_status_lookup %>%
+        dplyr::filter(sensor_status == input$sensor_test_status) %>%
+        dplyr::select(sensor_status_lookup_uid) %>%
+        dplyr::pull()
 
-     edt_sensor_test_q <- paste0("Update fieldwork.tbl_sensor_tests SET test_date = '",
-       input$date,
-       "', test_type_lookup_uid = ",
-       ifelse(input$test_type == "Level", 1, 2),
-       ", mean_abs_error_ft = ",
-       ifelse(input$test_type == "Level", input$mean_ae_ft, "NULL"),
-       ", max_abs_error_ft = ",
-       ifelse(input$test_type == "Level", input$max_ae_ft, "NULL"),
-       ", mean_abs_error_psi = ",
-       ifelse(input$test_type == "Baro", input$mean_ae_psi, "NULL"),
-       ", max_abs_error_psi = ",
-       ifelse(input$test_type == "Baro", input$max_ae_psi, "NULL"),
-       ", notes = '",
-       rv$test_note_trimmed(),
-       "' ",
-       "where sensor_tests_uid = ",
-       rv$sensor_tests()$sensor_tests_uid[rv$sensor_test_table_row()],
-       sep = ""
-     )
+      edt_sensor_test_q <- paste0("Update fieldwork.tbl_sensor_tests SET test_date = '",
+        input$date,
+        "', test_type_lookup_uid = ",
+        ifelse(input$test_type == "Level", 1, 2),
+        ", mean_abs_error_ft = ",
+        ifelse(input$test_type == "Level", input$mean_ae_ft, "NULL"),
+        ", max_abs_error_ft = ",
+        ifelse(input$test_type == "Level", input$max_ae_ft, "NULL"),
+        ", mean_abs_error_psi = ",
+        ifelse(input$test_type == "Baro", input$mean_ae_psi, "NULL"),
+        ", max_abs_error_psi = ",
+        ifelse(input$test_type == "Baro", input$max_ae_psi, "NULL"),
+        ", notes = '",
+        rv$test_note_trimmed(),
+        "' ",
+        "where sensor_tests_uid = ",
+        rv$sensor_tests()$sensor_tests_uid[rv$sensor_test_table_row()],
+        sep = ""
+      )
 
-     odbc::dbGetQuery(poolConn, edt_sensor_test_q)
+      odbc::dbGetQuery(poolConn, edt_sensor_test_q)
 
-     # status update
-     edt_sensor_status_qq <- paste("Update fieldwork.tbl_inventory_sensors SET sensor_status_lookup_uid = ", sensor_status_lookup_uid, " where inventory_sensors_uid = ", inv_uid, sep = "")
+      # status update
+      edt_sensor_status_qq <- paste("Update fieldwork.tbl_inventory_sensors SET sensor_status_lookup_uid = ", sensor_status_lookup_uid, " where inventory_sensors_uid = ", inv_uid, sep = "")
 
-     odbc::dbGetQuery(poolConn, edt_sensor_status_qq)
+      odbc::dbGetQuery(poolConn, edt_sensor_status_qq)
 
-     # Reload and reset
-     rv$sensor_tests <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
+      # Reload and reset
+      rv$sensor_tests <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
                                                                 fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) INNER JOIN
                                                                 fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)") %>%
-       dplyr::filter(sensor_serial == input$sensor_sn))
-     
-     # update calendar
-     rv$cal_table <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
+        dplyr::filter(sensor_serial == input$sensor_sn))
+
+      # update calendar
+      rv$cal_table <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
                                                                 fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) RIGHT JOIN
                                                                 fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)"))
-     reset("date")
-     reset("test_type")
-     reset("mean_ae_ft")
-     reset("max_ae_ft")
-     reset("mean_ae_psi")
-     reset("max_ae_psi")
-     reset("test_note")
-     reset("sensor_test_status")
+      reset("date")
+      reset("test_type")
+      reset("mean_ae_ft")
+      reset("max_ae_ft")
+      reset("mean_ae_psi")
+      reset("max_ae_psi")
+      reset("test_note")
+      reset("sensor_test_status")
 
-     # update other tab
-     rv$sensor_table <- odbc::dbGetQuery(poolConn, sensor_table_query)
-   }
- })
+      # update other tab
+      rv$sensor_table <- odbc::dbGetQuery(poolConn, sensor_table_query)
+    }
+  })
+  # get row number
+  rv$calendar_display_row <- reactive(getReactableState("calendar_display", "selected"))
 
-
- # get row number
- rv$calendar_display_row <- reactive(getReactableState("calendar_display", "selected"))
-
- # Sensor Testing Calendar tab -----
- rv$cal_table <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
+  # Sensor Testing Calendar tab -----
+  rv$cal_table <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
                                                                 fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) RIGHT JOIN
                                                                 fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)"))
 
- rv$cal_table_display <- reactive(rv$cal_table() %>%
-   group_by(sensor_serial) %>%
-   slice_max(order_by = test_date, with_ties = FALSE) %>%
-   ungroup() %>%
-   dplyr::arrange(test_date) %>%
-   dplyr::mutate(testing_deadline = data.table::fifelse(is.na(test_date), NA, test_date + lubridate::years(2))))
+  rv$cal_table_display <- reactive(rv$cal_table() %>%
+    group_by(sensor_serial) %>%
+    slice_max(order_by = test_date, with_ties = FALSE) %>%
+    ungroup() %>%
+    dplyr::arrange(test_date) %>%
+    dplyr::mutate(testing_deadline = data.table::fifelse(is.na(test_date), NA, test_date + lubridate::years(2))))
 
- output$calendar_display <- renderReactable(
-   reactable(
-     rv$cal_table_display() %>%
-       dplyr::select("Serial Number" = sensor_serial, "Model Number" = sensor_model, "Purchase Date" = date_purchased_asdate, "Sensor Status" = sensor_status, "SMP ID" = smp_id, "OW SUffix" = ow_suffix, "Test Type" = test_type, "Latest Test Date" = test_date, "Testing Deadline" = testing_deadline),
-     theme = darkly(),
-     fullWidth = TRUE,
-     selection = "single",
-     searchable = TRUE,
-     onClick = "select",
-     # searchable = TRUE,
-     showPageSizeOptions = TRUE,
-     pageSizeOptions = c(25, 50, 100),
-     defaultPageSize = 25,
-     columns = list("Testing Deadline" = colDef(
-       style = function(value) {
-         if (is.na(value)) {
-           # don't color code NAs
-         } else if (as.numeric(value - Sys.Date()) < 93 & as.numeric(value - Sys.Date()) > 0) {
-           return(list(background = "orange", color = "black", fontweight = "bold"))
-         } else if (as.numeric(value - Sys.Date()) < 1) {
-           return(list(background = "#A70D2A", color = "white", fontweight = "bold"))
-         } else {
-           # don't color code other dates
-         }
-       }
-     ))
-   ),
- )
+  output$calendar_display <- renderReactable(
+    reactable(
+      rv$cal_table_display() %>%
+        dplyr::select("Serial Number" = sensor_serial, "Model Number" = sensor_model, "Purchase Date" = date_purchased_asdate, "Sensor Status" = sensor_status, "SMP ID" = smp_id, "OW SUffix" = ow_suffix, "Test Type" = test_type, "Latest Test Date" = test_date, "Testing Deadline" = testing_deadline),
+      theme = darkly(),
+      fullWidth = TRUE,
+      selection = "single",
+      searchable = TRUE,
+      onClick = "select",
+      # searchable = TRUE,
+      showPageSizeOptions = TRUE,
+      pageSizeOptions = c(25, 50, 100),
+      defaultPageSize = 25,
+      columns = list("Testing Deadline" = colDef(
+        style = function(value) {
+          if (is.na(value)) {
+            # don't color code NAs
+          } else if (as.numeric(value - Sys.Date()) < 93 & as.numeric(value - Sys.Date()) > 0) {
+            return(list(background = "orange", color = "black", fontweight = "bold"))
+          } else if (as.numeric(value - Sys.Date()) < 1) {
+            return(list(background = "#A70D2A", color = "white", fontweight = "bold"))
+          } else {
+            # don't color code other dates
+          }
+        }
+      ))
+    ),
+  )
 
- # switch tabs
- observeEvent(rv$calendar_display_row(), {
-   updateTabsetPanel(session, "TabPanelID", selected = "test")
-   updateSelectInput(session, "sensor_sn", selected = rv$cal_table_display()$sensor_serial[rv$calendar_display_row()])
- })
+  # switch tabs
+  observeEvent(rv$calendar_display_row(), {
+    updateTabsetPanel(session, "TabPanelID", selected = "test")
+    updateSelectInput(session, "sensor_sn", selected = rv$cal_table_display()$sensor_serial[rv$calendar_display_row()])
+  })
 }
 
 
