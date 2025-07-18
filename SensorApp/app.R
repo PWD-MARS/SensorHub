@@ -102,7 +102,7 @@ sensor_issue_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_sensor_
 
 #Sensor Serial Number List
 hobo_list_query <-  "select inv.inventory_sensors_uid, inv.sensor_serial, inv.sensor_model, inv.date_purchased, 
-      ow.smp_id, ow.ow_suffix from fieldwork.viw_inventory_sensors_full inv
+      ow.smp_id, ow.ow_suffix from fieldwork.viw_inventory_sensors_full_trial inv
                           left join fieldwork.tbl_deployment d on d.inventory_sensors_uid = inv.inventory_sensors_uid AND d.collection_dtime is NULL
                             left join fieldwork.tbl_ow ow on ow.ow_uid = d.ow_uid"
 hobo_list <- odbc::dbGetQuery(poolConn, hobo_list_query)
@@ -234,7 +234,7 @@ server <- function(input, output, session) {
   #2.1 Query sensor table ----
   #2.1.1 initial query -----
   #Sensor Serial Number List
-  sensor_table_query <-  "select * from fieldwork.viw_inventory_sensors_full"
+  sensor_table_query <-  "select * from fieldwork.viw_inventory_sensors_full_trial"
   rv$sensor_table <- odbc::dbGetQuery(poolConn, sensor_table_query)
   
   #2.1.1.1 Query for viewing summary table ----
@@ -432,11 +432,9 @@ server <- function(input, output, session) {
     
     if(!(input$serial_no %in% rv$sensor_table$sensor_serial)){
       add_sensor_query <- paste0(
-        "INSERT INTO fieldwork.tbl_inventory_sensors (sensor_serial, sensor_model_lookup_uid, date_purchased, sensor_status_lookup_uid, 
-            sensor_issue_lookup_uid_one, sensor_issue_lookup_uid_two, request_data) 
-    	      VALUES ('", input$serial_no, "', ",rv$sensor_model_lookup_uid(), ", ",  
-        rv$date_purchased(), ", '", rv$status_lookup_uid(), "', ", 
-        rv$sensor_issue_lookup_uid_one(), ", ", rv$sensor_issue_lookup_uid_two(), ", ", rv$request_data(), ")")
+        "INSERT INTO fieldwork.tbl_inventory_sensors_trials (sensor_serial, sensor_model_lookup_uid, date_purchased) 
+    	      VALUES (", input$serial_no, ", ",rv$sensor_model_lookup_uid(), ", ",  
+        rv$date_purchased(), ")")
       
       odbc::dbGetQuery(poolConn, add_sensor_query)
       
@@ -444,8 +442,8 @@ server <- function(input, output, session) {
       
       #  to keep track of sensor status 
       add_sensor_status_log <- paste0(
-        "INSERT INTO fieldwork.tbl_sensor_status_log (sensor_serial, sensor_status_lookup_uid, date, sensor_issue_lookup_uid_one, sensor_issue_lookup_uid_two)
-        VALUES(", input$serial_no, ", ", rv$status_lookup_uid(), ", '", Sys.Date(), "', ", rv$sensor_issue_lookup_uid_one(), ", ", rv$sensor_issue_lookup_uid_two(),")"
+        "INSERT INTO fieldwork.tbl_sensor_status_log (sensor_serial, sensor_status_lookup_uid, date, sensor_issue_lookup_uid_one, sensor_issue_lookup_uid_two, request_data)
+        VALUES(", input$serial_no, ", ", rv$status_lookup_uid(), ", '", Sys.Date(), "', ", rv$sensor_issue_lookup_uid_one(), ", ", rv$sensor_issue_lookup_uid_two(),", ", rv$request_data(),")"
       )
       
       odbc::dbGetQuery(poolConn, add_sensor_status_log)
@@ -462,13 +460,9 @@ server <- function(input, output, session) {
       })
     }else{ #edit sensor info
       
-      update_sensor_query <- paste0("UPDATE fieldwork.tbl_inventory_sensors SET 
+      update_sensor_query <- paste0("UPDATE fieldwork.tbl_inventory_sensors_trials SET 
                                             sensor_model_lookup_uid = ", rv$sensor_model_lookup_uid(), ",
-                                            date_purchased = ", rv$date_purchased(), ", 
-                                            sensor_status_lookup_uid = '", rv$status_lookup_uid(), "', 
-                                            sensor_issue_lookup_uid_one = ", rv$sensor_issue_lookup_uid_one(), ",
-                                            sensor_issue_lookup_uid_two = ", rv$sensor_issue_lookup_uid_two(), ", 
-                                            request_data = ", rv$request_data(), "
+                                            date_purchased = ", rv$date_purchased(), " 
                                             WHERE sensor_serial = '", input$serial_no, "'")
       
       odbc::dbGetQuery(poolConn, update_sensor_query)
@@ -481,8 +475,8 @@ server <- function(input, output, session) {
       
       #  to keep track of sensor status 
       edit_sensor_status_log <- paste0(
-        "INSERT INTO fieldwork.tbl_sensor_status_log (sensor_serial, sensor_status_lookup_uid, date, sensor_issue_lookup_uid_one, sensor_issue_lookup_uid_two)
-        VALUES(", input$serial_no, ", ", rv$status_lookup_uid(), ", '", Sys.Date(), "', ", rv$sensor_issue_lookup_uid_one(), ", ", rv$sensor_issue_lookup_uid_two(),")"
+        "INSERT INTO fieldwork.tbl_sensor_status_log (sensor_serial, sensor_status_lookup_uid, date, sensor_issue_lookup_uid_one, sensor_issue_lookup_uid_two, request_data)
+        VALUES(", input$serial_no, ", ", rv$status_lookup_uid(), ", '", Sys.Date(), "', ", rv$sensor_issue_lookup_uid_one(), ", ", rv$sensor_issue_lookup_uid_two(),", ", rv$request_data() ,")"
       )
       
       odbc::dbGetQuery(poolConn, edit_sensor_status_log)
