@@ -440,11 +440,22 @@ server <- function(input, output, session) {
       
       odbc::dbGetQuery(poolConn, add_sensor_query)
       
+      
+      
+      #  to keep track of sensor status 
+      add_sensor_status_log <- paste0(
+        "INSERT INTO fieldwork.tbl_sensor_status_log (sensor_serial, sensor_status_lookup_uid, date, sensor_issue_lookup_uid_one, sensor_issue_lookup_uid_two)
+        VALUES(", input$serial_no, ", ", rv$status_lookup_uid(), ", '", Sys.Date(), "', ", rv$sensor_issue_lookup_uid_one(), ", ", rv$sensor_issue_lookup_uid_two(),")"
+      )
+      
+      odbc::dbGetQuery(poolConn, add_sensor_status_log)
+      
+      
       # log the INSERT query, see utils.R
-      insert.query.log(poolConn,
-                       add_sensor_query,
-                       tab_name,
-                       session)
+      # insert.query.log(poolConn,
+      #                  add_sensor_query,
+      #                  tab_name,
+      #                  session)
       
       output$testing <- renderText({
         isolate(paste("Sensor", input$serial_no, "added."))
@@ -463,10 +474,18 @@ server <- function(input, output, session) {
       odbc::dbGetQuery(poolConn, update_sensor_query)
       
       # log the UPDATE query, see utils.R
-      insert.query.log(poolConn,
-                       update_sensor_query,
-                       tab_name,
-                       session)
+      # insert.query.log(poolConn,
+      #                  update_sensor_query,
+      #                  tab_name,
+      #                  session)
+      
+      #  to keep track of sensor status 
+      edit_sensor_status_log <- paste0(
+        "INSERT INTO fieldwork.tbl_sensor_status_log (sensor_serial, sensor_status_lookup_uid, date, sensor_issue_lookup_uid_one, sensor_issue_lookup_uid_two)
+        VALUES(", input$serial_no, ", ", rv$status_lookup_uid(), ", '", Sys.Date(), "', ", rv$sensor_issue_lookup_uid_one(), ", ", rv$sensor_issue_lookup_uid_two(),")"
+      )
+      
+      odbc::dbGetQuery(poolConn, edit_sensor_status_log)
       
       output$testing <- renderText({
         isolate(paste("Sensor", input$serial_no, "edited."))
