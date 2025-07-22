@@ -715,7 +715,7 @@ server <- function(input, output, session) {
       # update calendar
       rv$cal_table <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
                                                                 fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) RIGHT JOIN
-                                                                fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)"))
+                                                                fieldwork.viw_inventory_sensors_full_trial USING(inventory_sensors_uid)"))
       reset("date")
       reset("test_type")
       reset("mean_ae_ft")
@@ -777,7 +777,7 @@ server <- function(input, output, session) {
       # update calendar
       rv$cal_table <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
                                                                 fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) RIGHT JOIN
-                                                                fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)"))
+                                                                fieldwork.viw_inventory_sensors_full_trial USING(inventory_sensors_uid)"))
       reset("date")
       reset("test_type")
       reset("mean_ae_ft")
@@ -797,7 +797,7 @@ server <- function(input, output, session) {
   # Sensor Testing Calendar tab -----
   rv$cal_table <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
                                                                 fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) RIGHT JOIN
-                                                                fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)"))
+                                                                fieldwork.viw_inventory_sensors_full_trial USING(inventory_sensors_uid)"))
 
   rv$cal_table_display <- reactive(rv$cal_table() %>%
     group_by(sensor_serial) %>%
