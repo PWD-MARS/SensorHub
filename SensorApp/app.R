@@ -175,6 +175,10 @@ ui <- tagList(useShinyjs(), navbarPage("Sensor App",
       tabPanel(
         "Sensor History Table",
         DTOutput("sensor_history_table")
+      ),
+      tabPanel(
+        "Sensor Status History Table",
+        DTOutput("sensor_status_table")
       )
     ))
   ),
@@ -282,6 +286,9 @@ server <- function(input, output, session) {
                                                  "Term" = "term",
                                                  "Notes" = "notes"))
   
+  
+  
+  
   #2.1.2 query on update ----
   #upon breaking a sensor in deploy
   # observeEvent(deploy$refresh_sensor(),{
@@ -300,6 +307,15 @@ server <- function(input, output, session) {
                                                "Location" = "ow_suffix", "Status" = "sensor_status", 
                                                "Issue #1" = "issue_one", "Issue #2" = "issue_two", "Request Data" = "request_data")
   )
+  
+  
+  # status log 
+  rv$status_log <- reactive(dbGetQuery(poolConn, "SELECT * FROM fieldwork.tbl_sensor_status_log") %>%
+                              dplyr::left_join(sensor_status_lookup, by = "sensor_status_lookup_uid") %>%
+                              dplyr::left_join(sensor_issue_lookup, by = c("sensor_issue_lookup_uid_one" ="sensor_issue_lookup_uid" )) %>%
+                              dplyr::left_join(sensor_issue_lookup, by = c("sensor_issue_lookup_uid_two" = "sensor_issue_lookup_uid" )) %>%
+                              dplyr:: arrange(desc(date)))
+  
   
   output$sensor_table <- renderDT(
     rv$sensor_table_display(),
@@ -325,6 +341,18 @@ server <- function(input, output, session) {
     selection = "none",
     options = list(pageLength = 15, lengthChange = FALSE)
   )
+  
+  output$sensor_status_table <- renderDT(
+    rv$status_log() %>%
+      dplyr::filter(sensor_serial == input$serial_no) %>%
+      dplyr::select("Serial Number" = sensor_serial, "Status" = sensor_status, Date = date, "Issue #1" = sensor_issue.x, "Issue #2" = sensor_issue.y), 
+    style = 'bootstrap',
+    selection = "none",
+    options = list(pageLength = 15, lengthChange = FALSE)
+  )
+  
+  
+  
   
   #2.3 prefilling inputs based on model serial number -----
   
