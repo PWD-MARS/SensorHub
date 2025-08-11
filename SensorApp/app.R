@@ -217,6 +217,7 @@ ui <- tagList(useShinyjs(), navbarPage("Sensor App",
         actionButton("clear_edit", "Clear All Fields")
       ),
       mainPanel(
+        h4(textOutput("test_table_header")),
         reactableOutput("sensor_test_table")
         
       )
@@ -663,6 +664,12 @@ server <- function(input, output, session) {
     removeModal()
   })
 
+
+  # headers
+  output$test_table_header <- renderText(
+    paste("Add/Edit Sensor Tests for Sensor ", input$sensor_sn)
+  )
+  
   # On click "submit_btn"
   observeEvent(input$add_update, {
     # process text field to prevent sql injection
