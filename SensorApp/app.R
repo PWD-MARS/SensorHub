@@ -111,7 +111,7 @@ hobo_list <- odbc::dbGetQuery(poolConn, hobo_list_query)
 sensor_serial <- hobo_list$sensor_serial
 
 
-ui <- tagList(useShinyjs(), navbarPage("Sensor App",
+ui <- tagList(useShinyjs(), navbarPage("Sensor Hub",
   id = "TabPanelID", theme = shinytheme("cyborg"),
   tabPanel(
     title = "Add/Edit Sensor", value = "add_sensor",
@@ -590,7 +590,8 @@ server <- function(input, output, session) {
   rv$sensor_tests <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
                                          fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) INNER JOIN
                                          fieldwork.viw_inventory_sensors_full_trial USING(inventory_sensors_uid) LEFT JOIN
-                                         fieldwork.tbl_sensortest_status_lookup USING(sensortest_status_lookup_uid)") %>%
+                                         fieldwork.tbl_sensortest_status_lookup USING(sensortest_status_lookup_uid)
+                                         order by test_date DESC") %>%
     dplyr::filter(sensor_serial == input$sensor_sn))
 
   # add/edit button toggle
