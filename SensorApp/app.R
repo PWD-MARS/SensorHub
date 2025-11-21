@@ -93,6 +93,9 @@ special_char_replace <- function(note){
   
 }
 
+#Active deployments
+active_deployment <- dbGetQuery(poolConn, "select sensor_serial, cast(date_80percent as DATE) as date_80percent_date, cast(date_100percent as DATE) as date_100percent_date from fieldwork.viw_active_deployments")
+
 #Sensor Model Number options
 sensor_model_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_sensor_model_lookup order by sensor_model_lookup_uid")
 
@@ -601,7 +604,7 @@ server <- function(input, output, session) {
   output$sensor_test_table <- renderReactable(
     reactable(
       rv$sensor_tests() %>%
-        select("Serial No" = sensor_serial, "Model" = sensor_model, "Purchase Date" = date_purchased_asdate, "Test Date" = test_date, "Test Type" = test_type, "Mean Absolute Error (ft)" = mean_abs_error_ft, "Max Absolute Error (ft)" = max_abs_error_ft, "Mean Absolute Error (PSI)" = mean_abs_error_psi, "Max Absolute Error (PSI)" = max_abs_error_psi, Status = test_status),
+        select("Serial No" = sensor_serial, "Model" = sensor_model, "Purchase Date" = date_purchased_asdate, "Test Start Date" = test_date, "Test Type" = test_type, "Mean Absolute Error (ft)" = mean_abs_error_ft, "Max Absolute Error (ft)" = max_abs_error_ft, "Mean Absolute Error (PSI)" = mean_abs_error_psi, "Max Absolute Error (PSI)" = max_abs_error_psi, Status = test_status),
       theme = darkly(),
       fullWidth = TRUE,
       selection = "single",
@@ -811,13 +814,16 @@ server <- function(input, output, session) {
     group_by(sensor_serial) %>%
     slice_max(order_by = test_date, with_ties = FALSE) %>%
     ungroup() %>%
-    dplyr::arrange(test_date) %>%
-    dplyr::mutate(testing_deadline = data.table::fifelse(is.na(test_date), NA, test_date + lubridate::years(2))))
+    dplyr::filter(is.na(sensor_status) | (sensor_status != "Disposed" & sensor_status != "Out for Repairs")) %>%
+    dplyr::mutate(testing_deadline = data.table::fifelse(is.na(test_date), date_purchased_asdate, test_date + lubridate::years(2))))
 
   output$calendar_display <- renderReactable(
     reactable(
       rv$cal_table_display() %>%
-        dplyr::select("Serial Number" = sensor_serial, "Model Number" = sensor_model, "Purchase Date" = date_purchased_asdate, "Sensor Status" = sensor_status, "SMP ID" = smp_id, "OW SUffix" = ow_suffix, "Test Type" = test_type, "Latest Test Date" = test_date, "Testing Deadline" = testing_deadline),
+        left_join(active_deployment, by = "sensor_serial") %>%
+        dplyr::arrange(testing_deadline)%>%
+        dplyr::arrange(test_date)%>%
+        dplyr::select("Serial Number" = sensor_serial, "Model Number" = sensor_model, "Purchase Date" = date_purchased_asdate, "Sensor Status" = sensor_status, "SMP ID" = smp_id, "OW SUffix" = ow_suffix, "Test Type" = test_type, "Latest Test Date" = test_date, "Testing Deadline" = testing_deadline, "Date 100% Full" = date_100percent_date),
       theme = darkly(),
       fullWidth = TRUE,
       selection = "single",
