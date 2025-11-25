@@ -852,7 +852,17 @@ server <- function(input, output, session) {
   # switch tabs
   observeEvent(rv$calendar_display_row(), {
     updateTabsetPanel(session, "TabPanelID", selected = "test")
-    updateSelectInput(session, "sensor_sn", selected = rv$cal_table_display()$`Serial Number`[rv$calendar_display_row()])
+    # clean up
+    reset("date")
+    reset("test_type")
+    reset("mean_ae_ft")
+    reset("max_ae_ft")
+    reset("mean_ae_psi")
+    reset("max_ae_psi")
+    reset("test_note")
+    reset("sensor_test_status")
+    # update
+    delay(100, updateSelectInput(session, "sensor_sn", selected = rv$cal_table_display()$`Serial Number`[rv$calendar_display_row()]))
   })
 }
 
