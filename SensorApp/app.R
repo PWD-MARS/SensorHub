@@ -862,7 +862,7 @@ server <- function(input, output, session) {
     reset("test_note")
     reset("sensor_test_status")
     # update
-    delay(100, updateSelectInput(session, "sensor_sn", selected = rv$cal_table_display()$`Serial Number`[rv$calendar_display_row()]))
+    delay(300, updateSelectInput(session, "sensor_sn", selected = rv$cal_table_display()$`Serial Number`[rv$calendar_display_row()]))
   })
 }
 
