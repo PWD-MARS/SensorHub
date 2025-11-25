@@ -805,7 +805,7 @@ server <- function(input, output, session) {
   # get row number
   rv$calendar_display_row <- reactive(getReactableState("calendar_display", "selected"))
 
-  # Sensor Testing Calendar tab -----
+  # 4.0 Sensor Testing Calendar tab -----
   rv$cal_table <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
                                                                 fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) RIGHT JOIN
                                                                 fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)"))
@@ -815,15 +815,15 @@ server <- function(input, output, session) {
     slice_max(order_by = test_date, with_ties = FALSE) %>%
     ungroup() %>%
     dplyr::filter(is.na(sensor_status) | (sensor_status != "Disposed" & sensor_status != "Out for Repairs")) %>%
-    dplyr::mutate(testing_deadline = data.table::fifelse(is.na(test_date), date_purchased_asdate, test_date + lubridate::years(2))))
+    dplyr::mutate(testing_deadline = data.table::fifelse(is.na(test_date), date_purchased_asdate, test_date + lubridate::years(2))) %>% 
+    dplyr::left_join(active_deployment, by = "sensor_serial") %>%
+    dplyr::arrange(testing_deadline)%>%
+    dplyr::arrange(test_date)%>%
+    dplyr::select("Serial Number" = sensor_serial, "Model Number" = sensor_model, "Purchase Date" = date_purchased_asdate, "Sensor Status" = sensor_status, "SMP ID" = smp_id, "OW SUffix" = ow_suffix, "Test Type" = test_type, "Latest Test Date" = test_date, "Testing Deadline" = testing_deadline, "Date 100% Full" = date_100percent_date))
 
   output$calendar_display <- renderReactable(
     reactable(
-      rv$cal_table_display() %>%
-        left_join(active_deployment, by = "sensor_serial") %>%
-        dplyr::arrange(testing_deadline)%>%
-        dplyr::arrange(test_date)%>%
-        dplyr::select("Serial Number" = sensor_serial, "Model Number" = sensor_model, "Purchase Date" = date_purchased_asdate, "Sensor Status" = sensor_status, "SMP ID" = smp_id, "OW SUffix" = ow_suffix, "Test Type" = test_type, "Latest Test Date" = test_date, "Testing Deadline" = testing_deadline, "Date 100% Full" = date_100percent_date),
+      rv$cal_table_display(),
       theme = darkly(),
       fullWidth = TRUE,
       selection = "single",
@@ -852,7 +852,7 @@ server <- function(input, output, session) {
   # switch tabs
   observeEvent(rv$calendar_display_row(), {
     updateTabsetPanel(session, "TabPanelID", selected = "test")
-    updateSelectInput(session, "sensor_sn", selected = rv$cal_table_display()$sensor_serial[rv$calendar_display_row()])
+    updateSelectInput(session, "sensor_sn", selected = rv$cal_table_display()$`Serial Number`[rv$calendar_display_row()])
   })
 }
 
