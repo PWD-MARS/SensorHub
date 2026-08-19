@@ -47,7 +47,7 @@ options(DT.options = list(pageLength = 15))
 poolConn <- dbPool(RPostgres::Postgres(),
                       host = "PWDMARSDBS1.pwd.phila.local",
                       port = 5434,
-                      dbname = "Post-Con",
+                      dbname = "mars_prod",
                       user = Sys.getenv("shiny_uid"),
                       password = Sys.getenv("shiny_pwd")
 )
@@ -823,13 +823,14 @@ server <- function(input, output, session) {
   rv$cal_table <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
                                                                 fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) RIGHT JOIN
                                                                 fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)"))
+  
+  rv$deadlines <- reactive(dbGetQuery(poolConn, "SELECT sensor_serial, cast(recent_test_date as DATE) as recent_test_date_asdate FROM fieldwork.viw_sensor_recent_tests"))
+  
 
   rv$cal_table_display <- reactive(rv$cal_table() %>%
-    group_by(sensor_serial) %>%
-    slice_max(order_by = test_date, with_ties = FALSE) %>%
-    ungroup() %>%
     dplyr::filter(is.na(sensor_status) | (sensor_status != "Disposed" & sensor_status != "Out for Repairs")) %>%
-    dplyr::mutate(testing_deadline = data.table::fifelse(is.na(test_date), date_purchased_asdate, test_date + lubridate::years(2))) %>% 
+    dplyr::left_join(rv$deadlines(), by = "sensor_serial") %>%
+    dplyr::mutate(testing_deadline = data.table::fifelse(is.na(recent_test_date_asdate), date_purchased_asdate, recent_test_date_asdate + lubridate::years(2))) %>% 
     dplyr::left_join(active_deployment, by = "sensor_serial") %>%
     dplyr::arrange(testing_deadline)%>%
     dplyr::arrange(test_date)%>%
