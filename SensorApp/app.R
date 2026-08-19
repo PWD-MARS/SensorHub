@@ -830,6 +830,7 @@ server <- function(input, output, session) {
   
 
   rv$cal_table_display <- reactive(rv$cal_table() %>%
+    dplyr::filter(sensor_status != "Disposed") %>%
     dplyr::left_join(rv$deadlines(), by = "sensor_serial") %>%
     dplyr::mutate(testing_deadline = data.table::fifelse(is.na(recent_test_date_asdate), date_purchased_asdate, recent_test_date_asdate + lubridate::years(2))) %>% 
     dplyr::left_join(active_deployment, by = "sensor_serial") %>%
