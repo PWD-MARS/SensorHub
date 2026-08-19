@@ -52,6 +52,8 @@ poolConn <- dbPool(RPostgres::Postgres(),
                       password = Sys.getenv("shiny_pwd")
 )
 
+`%!in%` <- Negate(`%in%`)
+
 
 #disconnect from db on stop 
 onStop(function(){
@@ -99,9 +101,9 @@ active_deployment <- dbGetQuery(poolConn, "select sensor_serial, cast(date_80per
 #Sensor Model Number options
 sensor_model_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_sensor_model_lookup order by sensor_model_lookup_uid")
 
-sensor_status_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_sensor_status_lookup order by sensor_status_lookup_uid")
-
-sensor_issue_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_sensor_issue_lookup order by sensor_issue_lookup_uid")
+sensor_status_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_sensor_status_lookup order by sensor_status_lookup_uid") 
+sensor_issue_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_sensor_issue_lookup order by sensor_issue_lookup_uid") %>%
+  filter(sensor_issue_lookup_uid %!in% c(2, 3, 5, 7, 10))
 
 test_status_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_sensortest_status_lookup")
 
