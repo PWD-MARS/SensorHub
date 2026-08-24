@@ -22,8 +22,6 @@ library(lubridate)
 library(shinyjs)
 #dropdownButton() for summary table in sensors tab
 library(shinyWidgets)
-#themes
-library(reactablefmtr)
 #accordions to improve sidebars
 library(bslib)
 #DT for datatables
