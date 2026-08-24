@@ -1,0 +1,12 @@
+name: sensorapp
+title: SensorApp
+username: monica.gucciardi
+account: monica.gucciardi
+server: pwdrstudio.phila.gov
+hostUrl: https://pwdrstudio.phila.gov/__api__
+appId: 647
+bundleId: 4650
+url: https://pwdrstudio.phila.gov/content/42cb4f5a-d685-4e12-a56a-0e4eba995979/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
