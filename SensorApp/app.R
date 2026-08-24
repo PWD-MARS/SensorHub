@@ -52,6 +52,8 @@ poolConn <- dbPool(RPostgres::Postgres(),
                       password = Sys.getenv("shiny_pwd")
 )
 
+`%!in%` <- Negate(`%in%`)
+
 
 #disconnect from db on stop 
 onStop(function(){
@@ -99,9 +101,9 @@ active_deployment <- dbGetQuery(poolConn, "select sensor_serial, cast(date_80per
 #Sensor Model Number options
 sensor_model_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_sensor_model_lookup order by sensor_model_lookup_uid")
 
-sensor_status_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_sensor_status_lookup order by sensor_status_lookup_uid")
-
-sensor_issue_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_sensor_issue_lookup order by sensor_issue_lookup_uid")
+sensor_status_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_sensor_status_lookup order by sensor_status_lookup_uid") 
+sensor_issue_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_sensor_issue_lookup order by sensor_issue_lookup_uid") %>%
+  filter(sensor_issue_lookup_uid %!in% c(2, 3, 5, 7, 10))
 
 test_status_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_sensortest_status_lookup")
 
@@ -198,7 +200,7 @@ ui <- tagList(useShinyjs(), navbarPage("Sensor Hub",
           condition = "input.test_type == 'Level'",
           fluidRow(column(
             6,
-            numericInput("mean_ae_ft", html_req("Mean Absolute Error (ft):"), 0, min = 0, max = 1000),
+            numericInput("mean_ae_ft", html_req("Mean Error (ft):"), 0, min = 0, max = 1000),
           ), column(
             6,
             numericInput("max_ae_ft", html_req("Maximum Absolute Error (ft):"), 0, min = 0, max = 1000)
@@ -208,7 +210,7 @@ ui <- tagList(useShinyjs(), navbarPage("Sensor Hub",
           condition = "input.test_type == 'Baro'",
           fluidRow(column(
             6,
-            numericInput("mean_ae_psi", html_req("Mean Absolute Error (PSI):"), 0, min = 0, max = 1000),
+            numericInput("mean_ae_psi", html_req("Mean Error (PSI):"), 0, min = 0, max = 1000),
           ), column(
             6,
             numericInput("max_ae_psi", html_req("Maximum Absolute Error (PSI):"), 0, min = 0, max = 1000)
@@ -604,13 +606,27 @@ server <- function(input, output, session) {
   output$sensor_test_table <- renderReactable(
     reactable(
       rv$sensor_tests() %>%
-        select("Serial No" = sensor_serial, "Model" = sensor_model, "Purchase Date" = date_purchased_asdate, "Test Start Date" = test_date, "Test Type" = test_type, "Mean Absolute Error (ft)" = mean_abs_error_ft, "Max Absolute Error (ft)" = max_abs_error_ft, "Mean Absolute Error (PSI)" = mean_abs_error_psi, "Max Absolute Error (PSI)" = max_abs_error_psi, Status = test_status),
+        select("Serial No" = sensor_serial, "Model" = sensor_model, "Purchase Date" = date_purchased_asdate, "Test Start Date" = test_date, "Test Type" = test_type, "Mean Error (ft)" = mean_error_ft, "Max Absolute Error (ft)" = max_abs_error_ft, "Mean Error (PSI)" = mean_error_psi, "Max Absolute Error (PSI)" = max_abs_error_psi, Status = test_status),
       theme = darkly(),
       fullWidth = TRUE,
       selection = "single",
       searchable = TRUE,
+      filterable = FALSE,      # column filters
       onClick = "select",
-      # searchable = TRUE,
+      columns = list(
+        Model = colDef(
+          filterable = TRUE
+        ),
+        `Test Type` = colDef(
+          filterable = TRUE
+        ),
+        `Test Start Date` = colDef(
+          filterable = TRUE
+        ),
+        Status = colDef(
+          filterable = TRUE
+        )
+      ),
       showPageSizeOptions = TRUE,
       pageSizeOptions = c(25, 50, 100),
       defaultPageSize = 25,
@@ -635,9 +651,9 @@ server <- function(input, output, session) {
     updateSelectInput(session, "sensor_sn", selected = rv$sensor_tests()$sensor_serial[rv$sensor_test_table_row()])
     updateSelectInput(session, "date", selected = rv$sensor_tests()$test_date[rv$sensor_test_table_row()])
     updateSelectInput(session, "test_type", selected = rv$sensor_tests()$test_type[rv$sensor_test_table_row()])
-    updateSelectInput(session, "mean_ae_ft", selected = rv$sensor_tests()$mean_abs_error_ft[rv$sensor_test_table_row()])
+    updateSelectInput(session, "mean_ae_ft", selected = rv$sensor_tests()$mean_error_ft[rv$sensor_test_table_row()])
     updateSelectInput(session, "max_ae_ft", selected = rv$sensor_tests()$max_abs_error_ft[rv$sensor_test_table_row()])
-    delay(100, updateSelectInput(session, "mean_ae_psi", selected = rv$sensor_tests()$mean_abs_error_psi[rv$sensor_test_table_row()]))
+    delay(100, updateSelectInput(session, "mean_ae_psi", selected = rv$sensor_tests()$mean_error_psi[rv$sensor_test_table_row()]))
     delay(100, updateSelectInput(session, "max_ae_psi", selected = rv$sensor_tests()$max_abs_error_psi[rv$sensor_test_table_row()]))
     updateTextAreaInput(session, "test_note", value = rv$sensor_tests()$notes[rv$sensor_test_table_row()])
     updateSelectInput(session, "sensor_test_status", selected = rv$sensor_tests()$test_status[rv$sensor_test_table_row()])
@@ -695,9 +711,9 @@ server <- function(input, output, session) {
       new_test_df <- data.frame(
         test_date = input$date,
         test_type_lookup_uid = ifelse(input$test_type == "Level", 1, 2),
-        mean_abs_error_ft = ifelse(input$test_type == "Level", input$mean_ae_ft, NA),
+        mean_error_ft = ifelse(input$test_type == "Level", input$mean_ae_ft, NA),
         max_abs_error_ft = ifelse(input$test_type == "Level", input$max_ae_ft, NA),
-        mean_abs_error_psi = ifelse(input$test_type == "Baro", input$mean_ae_psi, NA),
+        mean_error_psi = ifelse(input$test_type == "Baro", input$mean_ae_psi, NA),
         max_abs_error_psi = ifelse(input$test_type == "Baro", input$max_ae_psi, NA),
         notes = rv$test_note_trimmed(),
         sensortest_status_lookup_uid = sensortest_status_lookup_uid,
@@ -753,11 +769,11 @@ server <- function(input, output, session) {
         input$date,
         "', test_type_lookup_uid = ",
         ifelse(input$test_type == "Level", 1, 2),
-        ", mean_abs_error_ft = ",
+        ", mean_error_ft = ",
         ifelse(input$test_type == "Level", input$mean_ae_ft, "NULL"),
         ", max_abs_error_ft = ",
         ifelse(input$test_type == "Level", input$max_ae_ft, "NULL"),
-        ", mean_abs_error_psi = ",
+        ", mean_error_psi = ",
         ifelse(input$test_type == "Baro", input$mean_ae_psi, "NULL"),
         ", max_abs_error_psi = ",
         ifelse(input$test_type == "Baro", input$max_ae_psi, "NULL"),
@@ -809,13 +825,14 @@ server <- function(input, output, session) {
   rv$cal_table <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
                                                                 fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) RIGHT JOIN
                                                                 fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)"))
+  
+  rv$deadlines <- reactive(dbGetQuery(poolConn, "SELECT sensor_serial, cast(recent_test_date as DATE) as recent_test_date_asdate FROM fieldwork.viw_sensor_recent_tests"))
+  
 
   rv$cal_table_display <- reactive(rv$cal_table() %>%
-    group_by(sensor_serial) %>%
-    slice_max(order_by = test_date, with_ties = FALSE) %>%
-    ungroup() %>%
-    dplyr::filter(is.na(sensor_status) | (sensor_status != "Disposed" & sensor_status != "Out for Repairs")) %>%
-    dplyr::mutate(testing_deadline = data.table::fifelse(is.na(test_date), date_purchased_asdate, test_date + lubridate::years(2))) %>% 
+    dplyr::filter(sensor_status != "Disposed") %>%
+    dplyr::left_join(rv$deadlines(), by = "sensor_serial") %>%
+    dplyr::mutate(testing_deadline = data.table::fifelse(is.na(recent_test_date_asdate), date_purchased_asdate, recent_test_date_asdate + lubridate::years(2))) %>% 
     dplyr::left_join(active_deployment, by = "sensor_serial") %>%
     dplyr::arrange(testing_deadline)%>%
     dplyr::arrange(test_date)%>%
