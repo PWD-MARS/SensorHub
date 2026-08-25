@@ -36,6 +36,19 @@ library(renv)
 #set default page length for datatables
 options(DT.options = list(pageLength = 15))
 
+#
+options(reactable.theme = reactableTheme(
+  color = "hsl(233, 9%, 87%)",
+  backgroundColor = "hsl(233, 9%, 19%)",
+  borderColor = "hsl(233, 9%, 22%)",
+  stripedColor = "hsl(233, 12%, 22%)",
+  highlightColor = "hsl(233, 12%, 24%)",
+  inputStyle = list(backgroundColor = "hsl(233, 9%, 25%)"),
+  selectStyle = list(backgroundColor = "hsl(233, 9%, 25%)"),
+  pageButtonHoverStyle = list(backgroundColor = "hsl(233, 9%, 25%)"),
+  pageButtonActiveStyle = list(backgroundColor = "hsl(233, 9%, 28%)")
+))
+
 #set db connection
 #using a pool connection so separate connnections are unified
 #gets environmental variables saved in local or pwdrstudio environment
@@ -605,7 +618,6 @@ server <- function(input, output, session) {
     reactable(
       rv$sensor_tests() %>%
         select("Serial No" = sensor_serial, "Model" = sensor_model, "Purchase Date" = date_purchased_asdate, "Test Start Date" = test_date, "Test Type" = test_type, "Mean Error (ft)" = mean_error_ft, "Max Absolute Error (ft)" = max_abs_error_ft, "Mean Error (PSI)" = mean_error_psi, "Max Absolute Error (PSI)" = max_abs_error_psi, Status = test_status),
-      theme = darkly(),
       fullWidth = TRUE,
       selection = "single",
       searchable = TRUE,
@@ -635,7 +647,6 @@ server <- function(input, output, session) {
           style = "padding: 1rem",
           reactable(
             nested_notes,
-            theme = darkly(),
             outlined = TRUE
           )
         )
@@ -839,7 +850,6 @@ server <- function(input, output, session) {
   output$calendar_display <- renderReactable(
     reactable(
       rv$cal_table_display(),
-      theme = darkly(),
       fullWidth = TRUE,
       selection = "single",
       searchable = TRUE,
