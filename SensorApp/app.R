@@ -36,7 +36,7 @@ library(renv)
 #set default page length for datatables
 options(DT.options = list(pageLength = 15))
 
-#
+#Manually coding a reactable theme after removing reactablefmtr
 options(reactable.theme = reactableTheme(
   color = "hsl(233, 9%, 87%)",
   backgroundColor = "hsl(233, 9%, 19%)",
@@ -835,17 +835,16 @@ server <- function(input, output, session) {
                                                                 fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) RIGHT JOIN
                                                                 fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)"))
   
-  rv$deadlines <- reactive(dbGetQuery(poolConn, "SELECT sensor_serial, cast(recent_test_date as DATE) as recent_test_date_asdate FROM fieldwork.viw_sensor_recent_tests"))
+  rv$deadlines <- reactive(dbGetQuery(poolConn, "SELECT sensor_serial, test_deadline::date FROM fieldwork.viw_sensor_deadlines"))
   
 
   rv$cal_table_display <- reactive(rv$cal_table() %>%
     dplyr::filter(sensor_status != "Disposed") %>%
     dplyr::left_join(rv$deadlines(), by = "sensor_serial") %>%
-    dplyr::mutate(testing_deadline = data.table::fifelse(is.na(recent_test_date_asdate), date_purchased_asdate, recent_test_date_asdate + lubridate::years(2))) %>% 
     dplyr::left_join(active_deployment, by = "sensor_serial") %>%
-    dplyr::arrange(testing_deadline)%>%
+    dplyr::arrange(test_deadline)%>%
     dplyr::arrange(test_date)%>%
-    dplyr::select("Serial Number" = sensor_serial, "Model Number" = sensor_model, "Purchase Date" = date_purchased_asdate, "Sensor Status" = sensor_status, "SMP ID" = smp_id, "OW SUffix" = ow_suffix, "Test Type" = test_type, "Latest Test Date" = test_date, "Testing Deadline" = testing_deadline, "Date 100% Full" = date_100percent_date))
+    dplyr::select("Serial Number" = sensor_serial, "Model Number" = sensor_model, "Purchase Date" = date_purchased_asdate, "Sensor Status" = sensor_status, "SMP ID" = smp_id, "OW SUffix" = ow_suffix, "Test Type" = test_type, "Latest Test Date" = test_date, "Testing Deadline" = test_deadline, "Date 100% Full" = date_100percent_date))
 
   output$calendar_display <- renderReactable(
     reactable(
@@ -893,5 +892,6 @@ server <- function(input, output, session) {
 
 
 # Run the application
+
 shinyApp(ui = ui, server = server)
 
