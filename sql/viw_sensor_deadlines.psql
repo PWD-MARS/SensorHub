@@ -1,0 +1,39 @@
+-- Data structure added to prod with this commit
+-- View to calculate sensor test deadlines for sensor hub app
+
+create or replace view fieldwork.viw_sensor_deadlines as 
+with level_tests as 
+	(select i.inventory_sensors_uid, max(i.test_date) as level_date
+		from fieldwork.tbl_sensor_tests i where
+			i.test_type_lookup_uid = 1 and -- Level Tests
+			i.sensortest_status_lookup_uid = 1 -- Passed Tests
+		group by inventory_sensors_uid
+		order by inventory_sensors_uid asc),
+
+baro_tests as 
+	(select i.inventory_sensors_uid, max(i.test_date) as baro_date
+		from fieldwork.tbl_sensor_tests i where
+			i.test_type_lookup_uid = 2 and -- Baro Tests
+			i.sensortest_status_lookup_uid = 1 -- Passed Tests
+		group by inventory_sensors_uid
+		order by inventory_sensors_uid asc),
+
+purchase_dates as 
+	(select s.inventory_sensors_uid, s.date_purchased, s.sensor_serial
+		from fieldwork.tbl_inventory_sensors s),
+
+unified_dates as 
+	(select p.inventory_sensors_uid, p.sensor_serial, p.date_purchased, l.level_date, b.baro_date
+		from purchase_dates p
+			left join level_tests l using(inventory_sensors_uid)
+			left join baro_tests b using(inventory_sensors_uid))
+
+select *, 
+	case 
+		when u.level_date is null then u.date_purchased
+		else case
+			when u.baro_date is null then u.date_purchased
+			else least(u.level_date, u.baro_date) + interval '2 years'
+		end
+	end as test_deadline
+	from unified_dates u
