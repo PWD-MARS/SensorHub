@@ -58,7 +58,7 @@ options(reactable.theme = reactableTheme(
 poolConn <- dbPool(RPostgres::Postgres(),
                       host = "PWDMARSDBS1.pwd.phila.local",
                       port = 5434,
-                      dbname = "mars_prod",
+                      dbname = "mars_monica",
                       user = Sys.getenv("shiny_uid"),
                       password = Sys.getenv("shiny_pwd")
 )
@@ -110,17 +110,17 @@ special_char_replace <- function(note){
 active_deployment <- dbGetQuery(poolConn, "select sensor_serial, cast(date_80percent as DATE) as date_80percent_date, cast(date_100percent as DATE) as date_100percent_date from fieldwork.viw_active_deployments")
 
 #Sensor Model Number options
-sensor_model_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_sensor_model_lookup order by sensor_model_lookup_uid")
+sensor_model_lookup <- dbGetQuery(poolConn, "select * from sensors.tbl_sensor_model_lookup order by sensor_model_lookup_uid")
 
-sensor_status_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_sensor_status_lookup order by sensor_status_lookup_uid") 
-sensor_issue_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_sensor_issue_lookup order by sensor_issue_lookup_uid") %>%
+sensor_status_lookup <- dbGetQuery(poolConn, "select * from sensors.tbl_sensor_status_lookup order by sensor_status_lookup_uid") 
+sensor_issue_lookup <- dbGetQuery(poolConn, "select * from sensors.tbl_sensor_issue_lookup order by sensor_issue_lookup_uid") %>%
   filter(sensor_issue_lookup_uid %!in% c(2, 3, 5, 7, 10))
 
-test_status_lookup <- dbGetQuery(poolConn, "select * from fieldwork.tbl_sensortest_status_lookup")
+test_status_lookup <- dbGetQuery(poolConn, "select * from sensors.tbl_sensortest_status_lookup")
 
 #Sensor Serial Number List
 hobo_list_query <-  "select inv.inventory_sensors_uid, inv.sensor_serial, inv.sensor_model, inv.date_purchased, 
-      ow.smp_id, ow.ow_suffix from fieldwork.viw_inventory_sensors_full inv
+      ow.smp_id, ow.ow_suffix from sensors.viw_inventory_sensors_full inv
                           left join fieldwork.tbl_deployment d on d.inventory_sensors_uid = inv.inventory_sensors_uid AND d.collection_dtime is NULL
                             left join fieldwork.tbl_ow ow on ow.ow_uid = d.ow_uid"
 hobo_list <- odbc::dbGetQuery(poolConn, hobo_list_query)
@@ -257,11 +257,11 @@ server <- function(input, output, session) {
   #2.1 Query sensor table ----
   #2.1.1 initial query -----
   #Sensor Serial Number List
-  sensor_table_query <-  "select * from fieldwork.viw_inventory_sensors_full"
+  sensor_table_query <-  "select * from sensors.viw_inventory_sensors_full"
   rv$sensor_table <- odbc::dbGetQuery(poolConn, sensor_table_query)
   
   #2.1.1.1 Query for viewing summary table ----
-  sensor_query <- "SELECT * FROM fieldwork.viw_inventory_sensors_status"
+  sensor_query <- "SELECT * FROM sensors.viw_inventory_sensors_status"
   rv$sensor_dt <- reactive(odbc::dbGetQuery(poolConn, sensor_query) %>%
                              mutate(Deployed = !is.na(active_ow_deployment)))
   
@@ -329,7 +329,7 @@ server <- function(input, output, session) {
   
   
   # status log 
-  rv$status_log <- reactive(dbGetQuery(poolConn, "SELECT * FROM fieldwork.tbl_sensor_status_log") %>%
+  rv$status_log <- reactive(dbGetQuery(poolConn, "SELECT * FROM sensors.tbl_sensor_status_log") %>%
                               dplyr::left_join(sensor_status_lookup, by = "sensor_status_lookup_uid") %>%
                               dplyr::left_join(sensor_issue_lookup, by = c("sensor_issue_lookup_uid_one" ="sensor_issue_lookup_uid" )) %>%
                               dplyr::left_join(sensor_issue_lookup, by = c("sensor_issue_lookup_uid_two" = "sensor_issue_lookup_uid" )) %>%
@@ -479,7 +479,7 @@ server <- function(input, output, session) {
     
     if(!(input$serial_no %in% rv$sensor_table$sensor_serial)){
       add_sensor_query <- paste0(
-        "INSERT INTO fieldwork.tbl_inventory_sensors (sensor_serial, sensor_model_lookup_uid, date_purchased) 
+        "INSERT INTO sensors.tbl_inventory_sensors (sensor_serial, sensor_model_lookup_uid, date_purchased) 
     	      VALUES (", input$serial_no, ", ",rv$sensor_model_lookup_uid(), ", ",  
         rv$date_purchased(), ")")
       
@@ -489,7 +489,7 @@ server <- function(input, output, session) {
       
       #  to keep track of sensor status 
       add_sensor_status_log <- paste0(
-        "INSERT INTO fieldwork.tbl_sensor_status_log (sensor_serial, sensor_status_lookup_uid, date, sensor_issue_lookup_uid_one, sensor_issue_lookup_uid_two, request_data)
+        "INSERT INTO sensors.tbl_sensor_status_log (sensor_serial, sensor_status_lookup_uid, date, sensor_issue_lookup_uid_one, sensor_issue_lookup_uid_two, request_data)
         VALUES(", input$serial_no, ", ", rv$status_lookup_uid(), ", '", Sys.Date(), "', ", rv$sensor_issue_lookup_uid_one(), ", ", rv$sensor_issue_lookup_uid_two(),", ", rv$request_data(),")"
       )
       
@@ -507,7 +507,7 @@ server <- function(input, output, session) {
       })
     }else{ #edit sensor info
       
-      update_sensor_query <- paste0("UPDATE fieldwork.tbl_inventory_sensors SET 
+      update_sensor_query <- paste0("UPDATE sensors.tbl_inventory_sensors SET 
                                             sensor_model_lookup_uid = ", rv$sensor_model_lookup_uid(), ",
                                             date_purchased = ", rv$date_purchased(), " 
                                             WHERE sensor_serial = '", input$serial_no, "'")
@@ -522,7 +522,7 @@ server <- function(input, output, session) {
       
       #  to keep track of sensor status 
       edit_sensor_status_log <- paste0(
-        "INSERT INTO fieldwork.tbl_sensor_status_log (sensor_serial, sensor_status_lookup_uid, date, sensor_issue_lookup_uid_one, sensor_issue_lookup_uid_two, request_data)
+        "INSERT INTO sensors.tbl_sensor_status_log (sensor_serial, sensor_status_lookup_uid, date, sensor_issue_lookup_uid_one, sensor_issue_lookup_uid_two, request_data)
         VALUES(", input$serial_no, ", ", rv$status_lookup_uid(), ", '", Sys.Date(), "', ", rv$sensor_issue_lookup_uid_one(), ", ", rv$sensor_issue_lookup_uid_two(),", ", rv$request_data() ,")"
       )
       
@@ -603,10 +603,10 @@ server <- function(input, output, session) {
   # row references
   rv$sensor_test_table_row <- reactive(getReactableState("sensor_test_table", "selected"))
 
-  rv$sensor_tests <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
-                                         fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) INNER JOIN
-                                         fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid) LEFT JOIN
-                                         fieldwork.tbl_sensortest_status_lookup USING(sensortest_status_lookup_uid)
+  rv$sensor_tests <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM sensors.tbl_sensor_tests INNER JOIN
+                                         sensors.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) INNER JOIN
+                                         sensors.viw_inventory_sensors_full USING(inventory_sensors_uid) LEFT JOIN
+                                         sensors.tbl_sensortest_status_lookup USING(sensortest_status_lookup_uid)
                                          order by test_date DESC") %>%
     dplyr::filter(sensor_serial == input$sensor_sn))
 
@@ -729,29 +729,29 @@ server <- function(input, output, session) {
         inventory_sensors_uid = inv_uid
       )
 
-      odbc::dbWriteTable(poolConn, Id(schema = "fieldwork", table = "tbl_sensor_tests"), new_test_df, append = TRUE, row.names = FALSE)
+      odbc::dbWriteTable(poolConn, Id(schema = "sensors", table = "tbl_sensor_tests"), new_test_df, append = TRUE, row.names = FALSE)
 # 
 #       sensor_status_lookup_uid <- sensor_status_lookup %>%
 #         dplyr::filter(sensor_status == input$sensor_test_status) %>%
 #         dplyr::select(sensor_status_lookup_uid) %>%
 #         dplyr::pull()
 # 
-#       edt_sensor_status_q <- paste("Update fieldwork.tbl_inventory_sensors SET sensor_status_lookup_uid = ", sensor_status_lookup_uid, " where inventory_sensors_uid = ", inv_uid, sep = "")
+#       edt_sensor_status_q <- paste("Update sensors.tbl_inventory_sensors SET sensor_status_lookup_uid = ", sensor_status_lookup_uid, " where inventory_sensors_uid = ", inv_uid, sep = "")
 # 
 #       odbc::dbGetQuery(poolConn, edt_sensor_status_q)
 
       # Reload and reset
-      rv$sensor_tests <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
-                                         fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) INNER JOIN
-                                         fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid) LEFT JOIN
-                                         fieldwork.tbl_sensortest_status_lookup USING(sensortest_status_lookup_uid)") %>%
+      rv$sensor_tests <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM sensors.tbl_sensor_tests INNER JOIN
+                                         sensors.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) INNER JOIN
+                                         sensors.viw_inventory_sensors_full USING(inventory_sensors_uid) LEFT JOIN
+                                         sensors.tbl_sensortest_status_lookup USING(sensortest_status_lookup_uid)") %>%
                                     dplyr::filter(sensor_serial == input$sensor_sn))
 
 
       # update calendar
-      rv$cal_table <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
-                                                                fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) RIGHT JOIN
-                                                                fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)"))
+      rv$cal_table <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM sensors.tbl_sensor_tests INNER JOIN
+                                                                sensors.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) RIGHT JOIN
+                                                                sensors.viw_inventory_sensors_full USING(inventory_sensors_uid)"))
       reset("date")
       reset("test_type")
       reset("mean_ae_ft")
@@ -774,7 +774,7 @@ server <- function(input, output, session) {
       #   dplyr::select(sensor_status_lookup_uid) %>%
       #   dplyr::pull()
 
-      edt_sensor_test_q <- paste0("Update fieldwork.tbl_sensor_tests SET test_date = '",
+      edt_sensor_test_q <- paste0("Update sensors.tbl_sensor_tests SET test_date = '",
         input$date,
         "', test_type_lookup_uid = ",
         ifelse(input$test_type == "Level", 1, 2),
@@ -798,22 +798,22 @@ server <- function(input, output, session) {
       odbc::dbGetQuery(poolConn, edt_sensor_test_q)
 
       # # status update
-      # edt_sensor_status_qq <- paste("Update fieldwork.tbl_inventory_sensors SET sensor_status_lookup_uid = ", sensor_status_lookup_uid, " where inventory_sensors_uid = ", inv_uid, sep = "")
+      # edt_sensor_status_qq <- paste("Update sensors.tbl_inventory_sensors SET sensor_status_lookup_uid = ", sensor_status_lookup_uid, " where inventory_sensors_uid = ", inv_uid, sep = "")
       # 
       # odbc::dbGetQuery(poolConn, edt_sensor_status_qq)
 
       # Reload and reset
-      rv$sensor_tests <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
-                                         fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) INNER JOIN
-                                         fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid) LEFT JOIN
-                                         fieldwork.tbl_sensortest_status_lookup USING(sensortest_status_lookup_uid)") %>%
+      rv$sensor_tests <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM sensors.tbl_sensor_tests INNER JOIN
+                                         sensors.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) INNER JOIN
+                                         sensors.viw_inventory_sensors_full USING(inventory_sensors_uid) LEFT JOIN
+                                         sensors.tbl_sensortest_status_lookup USING(sensortest_status_lookup_uid)") %>%
                                     dplyr::filter(sensor_serial == input$sensor_sn))
       
       
       # update calendar
-      rv$cal_table <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
-                                                                fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) RIGHT JOIN
-                                                                fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)"))
+      rv$cal_table <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM sensors.tbl_sensor_tests INNER JOIN
+                                                                sensors.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) RIGHT JOIN
+                                                                sensors.viw_inventory_sensors_full USING(inventory_sensors_uid)"))
       reset("date")
       reset("test_type")
       reset("mean_ae_ft")
@@ -831,11 +831,11 @@ server <- function(input, output, session) {
   rv$calendar_display_row <- reactive(getReactableState("calendar_display", "selected"))
 
   # 4.0 Sensor Testing Calendar tab -----
-  rv$cal_table <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM fieldwork.tbl_sensor_tests INNER JOIN
-                                                                fieldwork.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) RIGHT JOIN
-                                                                fieldwork.viw_inventory_sensors_full USING(inventory_sensors_uid)"))
+  rv$cal_table <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM sensors.tbl_sensor_tests INNER JOIN
+                                                                sensors.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) RIGHT JOIN
+                                                                sensors.viw_inventory_sensors_full USING(inventory_sensors_uid)"))
   
-  rv$deadlines <- reactive(dbGetQuery(poolConn, "SELECT sensor_serial, test_deadline::date FROM fieldwork.viw_sensor_deadlines"))
+  rv$deadlines <- reactive(dbGetQuery(poolConn, "SELECT sensor_serial, test_deadline::date FROM sensors.viw_sensor_deadlines"))
   
 
   rv$cal_table_display <- reactive(rv$cal_table() %>%
