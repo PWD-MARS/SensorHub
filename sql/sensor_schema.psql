@@ -1,0 +1,48 @@
+create schema if not exists sensors;
+
+alter default privileges for role mars_shiny in schema sensors
+	grant delete, insert, select, update on tables to mars_shiny;
+
+alter default privileges for role mars_shiny in schema sensors
+	grant execute on functions to mars_shiny;
+
+alter default privileges for role mars_shiny in schema sensors
+	grant all on sequences to mars_shiny;
+
+alter default privileges for role mars_readonly in schema sensors
+	grant select on tables to mars_readonly;
+
+alter default privileges for role mars_readonly in schema sensors
+	grant execute on functions to mars_readonly;
+
+alter default privilegealter table if exists s for role mars_readonly in schema sensors
+	``grant select, usage on sequences to mars_readonly;
+
+alter default privileges for role mars_analyst in schema sensors
+	grant insert, select on tables to mars_analyst;
+
+alter default privileges for role mars_analyst in schema sensors
+	grant execute on functions to mars_analyst;
+
+alter default privileges for role mars_analyst in schema sensors
+	grant select, usage on sequences to mars_analyst;
+
+-- Relevant sequences, indexes, and constraints also moved
+-- https://www.postgresql.org/docs/14/sql-altertable.html see SET SCHEMA for more
+alter table if exists fieldwork.tbl_sensor_model_lookup set schema sensors;
+alter table if exists fieldwork.tbl_sensor_status_lookup set schema sensors;
+alter table if exists fieldwork.tbl_sensor_issue_lookup set schema sensors;
+alter table if exists fieldwork.tbl_sensortest_status_lookup set schema sensors;
+alter table if exists fieldwork.viw_inventory_sensors_full set schema sensors;
+alter table if exists fieldwork.viw_inventory_sensors_status set schema sensors;
+alter table if exists fieldwork.tbl_sensor_status_log set schema sensors;
+alter table if exists fieldwork.tbl_inventory_sensors set schema sensors;
+alter table if exists fieldwork.tbl_sensor_tests set schema sensors;
+alter table if exists fieldwork.tbl_sensor_test_type_lookup set schema sensors;
+alter table if exists fieldwork.viw_sensor_deadlines set schema sensors;
+alter table if exists fieldwork.viw_sensor_tests_full set schema sensors;
+alter table if exists fieldwork.viw_sensor_recent_tests set schema sensors;
+alter table if exists fieldwork.viw_sensor_current_status set schema sensors;
+
+
+
