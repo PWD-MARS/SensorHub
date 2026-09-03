@@ -14,9 +14,9 @@ alter table fieldwork.viw_deployment_full rename column inventory_sensors_uid to
 alter table fieldwork.viw_deployment_full_cwl rename column inventory_sensors_uid to sensor_uid;
 alter table fieldwork.viw_future_deployments_full rename column inventory_sensors_uid to sensor_uid;
 alter table fieldwork.viw_previous_deployments rename column inventory_sensors_uid to sensor_uid;
-alter table fieldwork.viw_sensor_tests_full rename column inventory_sensors_uid to sensor_uid;
-alter table fieldwork.viw_sensor_recent_tests rename column inventory_sensors_uid to sensor_uid;
-alter table fieldwork.viw_sensor_current_status rename column inventory_sensors_uid to sensor_uid;
+alter table sensors.viw_sensor_tests_full rename column inventory_sensors_uid to sensor_uid;
+alter table sensors.viw_sensor_recent_tests rename column inventory_sensors_uid to sensor_uid;
+alter table sensors.viw_sensor_current_status rename column inventory_sensors_uid to sensor_uid;
 alter table sensors.viw_inventory_sensors_status rename column inventory_sensors_uid to sensor_uid;
 alter table fieldwork.viw_inventory_sensors_full_archive rename column inventory_sensors_uid to sensor_uid;
 alter table fieldwork.viw_deployment_full_cwl_with_baro rename column inventory_sensors_uid to sensor_uid;
