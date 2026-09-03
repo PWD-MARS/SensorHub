@@ -1,0 +1,30 @@
+-- Find all tables and views and matviews
+select t.table_schema,
+       t.table_name,
+	   concat(t.table_schema, '.', t.table_name) as full_name
+from information_schema.tables t
+inner join information_schema.columns c on c.table_name = t.table_name 
+                                and c.table_schema = t.table_schema
+where c.column_name = 'inventory_sensors_uid'
+      and t.table_schema not in ('information_schema', 'pg_catalog')
+order by t.table_schema;
+
+alter table fieldwork.viw_active_deployments rename column inventory_sensors_uid to sensor_uid;
+alter table fieldwork.viw_deployment_full rename column inventory_sensors_uid to sensor_uid;
+alter table fieldwork.viw_deployment_full_cwl rename column inventory_sensors_uid to sensor_uid;
+alter table fieldwork.viw_future_deployments_full rename column inventory_sensors_uid to sensor_uid;
+alter table fieldwork.viw_previous_deployments rename column inventory_sensors_uid to sensor_uid;
+alter table fieldwork.viw_sensor_tests_full rename column inventory_sensors_uid to sensor_uid;
+alter table fieldwork.viw_sensor_recent_tests rename column inventory_sensors_uid to sensor_uid;
+alter table fieldwork.viw_sensor_current_status rename column inventory_sensors_uid to sensor_uid;
+alter table sensors.viw_inventory_sensors_status rename column inventory_sensors_uid to sensor_uid;
+alter table fieldwork.viw_inventory_sensors_full_archive rename column inventory_sensors_uid to sensor_uid;
+alter table fieldwork.viw_deployment_full_cwl_with_baro rename column inventory_sensors_uid to sensor_uid;
+alter table fieldwork.viw_qaqc_deployments rename column inventory_sensors_uid to sensor_uid;
+alter table sensors.viw_sensor_deadlines rename column inventory_sensors_uid to sensor_uid;
+alter table sensors.viw_inventory_sensors_full rename column inventory_sensors_uid to sensor_uid;
+alter table sensors.tbl_sensor_tests rename column inventory_sensors_uid to sensor_uid;
+alter table fieldwork.tbl_future_deployment rename column inventory_sensors_uid to sensor_uid;
+alter table fieldwork.tbl_deployment rename column inventory_sensors_uid to sensor_uid;
+alter table fieldwork.tbl_inventory_sensors_archive rename column inventory_sensors_uid to sensor_uid;
+alter table sensors.tbl_inventory_sensors rename column inventory_sensors_uid to sensor_uid;
