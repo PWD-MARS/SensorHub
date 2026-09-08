@@ -19,8 +19,8 @@ alter default privileges for role mars_readonly in schema sensors
 alter default privileges for role mars_readonly in schema sensors
 	grant execute on functions to mars_readonly;
 
-alter default privilegealter table if exists s for role mars_readonly in schema sensors
-	``grant select, usage on sequences to mars_readonly;
+alter default privileges for role mars_readonly in schema sensors
+	grant select, usage on sequences to mars_readonly;
 
 alter default privileges for role mars_analyst in schema sensors
 	grant insert, select on tables to mars_analyst;
@@ -54,7 +54,7 @@ alter table if exists sensors.tbl_inventory_sensors rename to tbl_sensor;
 
 -- Rename sensortest status table
 alter table if exists sensors.tbl_sensortest_status_lookup rename to tbl_sensor_test_status_lookup;
-alter table if exists sensors.tbl_sensor_test_status_lookup rename column sensortest_status_lookup_uid to sensor_test_status_lookup_uid
+alter table if exists sensors.tbl_sensor_test_status_lookup rename column sensortest_status_lookup_uid to sensor_test_status_lookup_uid;
 
 -- Modify relevant SQL function
 CREATE OR REPLACE FUNCTION fieldwork.fun_sensor_isnt_deployed(
