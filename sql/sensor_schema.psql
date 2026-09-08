@@ -49,6 +49,9 @@ alter table if exists fieldwork.viw_sensor_tests_full set schema sensors;
 alter table if exists fieldwork.viw_sensor_recent_tests set schema sensors;
 alter table if exists fieldwork.viw_sensor_current_status set schema sensors;
 
+-- Rename inventory table
+alter table if exists sensors.tbl_inventory_sensors rename to tbl_sensor;
+
 -- Rename UID fields
 alter table fieldwork.viw_active_deployments rename column inventory_sensors_uid to sensor_uid;
 alter table fieldwork.viw_deployment_full rename column inventory_sensors_uid to sensor_uid;
