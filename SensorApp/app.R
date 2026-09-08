@@ -116,7 +116,7 @@ sensor_status_lookup <- dbGetQuery(poolConn, "select * from sensors.tbl_sensor_s
 sensor_issue_lookup <- dbGetQuery(poolConn, "select * from sensors.tbl_sensor_issue_lookup order by sensor_issue_lookup_uid") %>%
   filter(sensor_issue_lookup_uid %!in% c(2, 3, 5, 7, 10))
 
-test_status_lookup <- dbGetQuery(poolConn, "select * from sensors.tbl_sensortest_status_lookup")
+test_status_lookup <- dbGetQuery(poolConn, "select * from sensors.tbl_sensor_test_status_lookup")
 
 #Sensor Serial Number List
 hobo_list_query <-  "select inv.inventory_sensors_uid, inv.sensor_serial, inv.sensor_model, inv.date_purchased, 
@@ -606,7 +606,7 @@ server <- function(input, output, session) {
   rv$sensor_tests <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM sensors.tbl_sensor_tests INNER JOIN
                                          sensors.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) INNER JOIN
                                          sensors.viw_inventory_sensors_full USING(inventory_sensors_uid) LEFT JOIN
-                                         sensors.tbl_sensortest_status_lookup USING(sensortest_status_lookup_uid)
+                                         sensors.tbl_sensor_test_status_lookup USING(sensor_test_status_lookup_uid)
                                          order by test_date DESC") %>%
     dplyr::filter(sensor_serial == input$sensor_sn))
 
@@ -710,9 +710,9 @@ server <- function(input, output, session) {
       dplyr::select(inventory_sensors_uid) %>%
       dplyr::pull()
     
-    sensortest_status_lookup_uid <- test_status_lookup %>%
+    sensor_test_status_lookup_uid <- test_status_lookup %>%
       dplyr::filter(test_status == input$sensor_test_status) %>%
-      dplyr::select(sensortest_status_lookup_uid) %>%
+      dplyr::select(sensor_test_status_lookup_uid) %>%
       dplyr::pull()
 
 
@@ -725,7 +725,7 @@ server <- function(input, output, session) {
         mean_error_psi = ifelse(input$test_type == "Baro", input$mean_ae_psi, NA),
         max_abs_error_psi = ifelse(input$test_type == "Baro", input$max_ae_psi, NA),
         notes = rv$test_note_trimmed(),
-        sensortest_status_lookup_uid = sensortest_status_lookup_uid,
+        sensor_test_status_lookup_uid = sensor_test_status_lookup_uid,
         inventory_sensors_uid = inv_uid
       )
 
@@ -744,7 +744,7 @@ server <- function(input, output, session) {
       rv$sensor_tests <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM sensors.tbl_sensor_tests INNER JOIN
                                          sensors.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) INNER JOIN
                                          sensors.viw_inventory_sensors_full USING(inventory_sensors_uid) LEFT JOIN
-                                         sensors.tbl_sensortest_status_lookup USING(sensortest_status_lookup_uid)") %>%
+                                         sensors.tbl_sensor_test_status_lookup USING(sensor_test_status_lookup_uid)") %>%
                                     dplyr::filter(sensor_serial == input$sensor_sn))
 
 
@@ -788,8 +788,8 @@ server <- function(input, output, session) {
         ifelse(input$test_type == "Baro", input$max_ae_psi, "NULL"),
         ", notes = '",
         rv$test_note_trimmed(),
-        "', sensortest_status_lookup_uid = ",
-        sensortest_status_lookup_uid,
+        "', sensor_test_status_lookup_uid = ",
+        sensor_test_status_lookup_uid,
         " where sensor_tests_uid = ",
         rv$sensor_tests()$sensor_tests_uid[rv$sensor_test_table_row()],
         sep = ""
@@ -806,7 +806,7 @@ server <- function(input, output, session) {
       rv$sensor_tests <- reactive(dbGetQuery(poolConn, "SELECT *, cast(date_purchased as DATE) as date_purchased_asdate FROM sensors.tbl_sensor_tests INNER JOIN
                                          sensors.tbl_sensor_test_type_lookup USING(test_type_lookup_uid) INNER JOIN
                                          sensors.viw_inventory_sensors_full USING(inventory_sensors_uid) LEFT JOIN
-                                         sensors.tbl_sensortest_status_lookup USING(sensortest_status_lookup_uid)") %>%
+                                         sensors.tbl_sensor_test_status_lookup USING(sensor_test_status_lookup_uid)") %>%
                                     dplyr::filter(sensor_serial == input$sensor_sn))
       
       
