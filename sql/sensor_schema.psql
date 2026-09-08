@@ -1,0 +1,102 @@
+create schema if not exists sensors;
+
+grant usage on schema sensors to mars_shiny;
+grant usage on schema sensors to mars_analyst;
+grant usage on schema sensors to mars_readonly;
+
+alter default privileges for role mars_shiny in schema sensors
+	grant delete, insert, select, update on tables to mars_shiny;
+
+alter default privileges for role mars_shiny in schema sensors
+	grant execute on functions to mars_shiny;
+
+alter default privileges for role mars_shiny in schema sensors
+	grant all on sequences to mars_shiny;
+
+alter default privileges for role mars_readonly in schema sensors
+	grant select on tables to mars_readonly;
+
+alter default privileges for role mars_readonly in schema sensors
+	grant execute on functions to mars_readonly;
+
+alter default privileges for role mars_readonly in schema sensors
+	grant select, usage on sequences to mars_readonly;
+
+alter default privileges for role mars_analyst in schema sensors
+	grant insert, select on tables to mars_analyst;
+
+alter default privileges for role mars_analyst in schema sensors
+	grant execute on functions to mars_analyst;
+
+alter default privileges for role mars_analyst in schema sensors
+	grant select, usage on sequences to mars_analyst;
+
+-- Relevant sequences, indexes, and constraints also moved
+-- https://www.postgresql.org/docs/14/sql-altertable.html see SET SCHEMA for more
+alter table if exists fieldwork.tbl_sensor_model_lookup set schema sensors;
+alter table if exists fieldwork.tbl_sensor_status_lookup set schema sensors;
+alter table if exists fieldwork.tbl_sensor_issue_lookup set schema sensors;
+alter table if exists fieldwork.tbl_sensor_purpose_lookup set schema sensors;
+alter table if exists fieldwork.tbl_sensortest_status_lookup set schema sensors;
+alter table if exists fieldwork.viw_inventory_sensors_full set schema sensors;
+alter table if exists fieldwork.viw_inventory_sensors_status set schema sensors;
+alter table if exists fieldwork.tbl_sensor_status_log set schema sensors;
+alter table if exists fieldwork.tbl_inventory_sensors set schema sensors;
+alter table if exists fieldwork.tbl_sensor_tests set schema sensors;
+alter table if exists fieldwork.tbl_sensor_test_type_lookup set schema sensors;
+alter table if exists fieldwork.viw_sensor_deadlines set schema sensors;
+alter table if exists fieldwork.viw_sensor_tests_full set schema sensors;
+alter table if exists fieldwork.viw_sensor_recent_tests set schema sensors;
+alter table if exists fieldwork.viw_sensor_current_status set schema sensors;
+
+-- Rename inventory table
+alter table if exists sensors.tbl_inventory_sensors rename to tbl_sensor;
+
+-- Rename sensortest status table
+alter table if exists sensors.tbl_sensortest_status_lookup rename to tbl_sensor_test_status_lookup;
+alter table if exists sensors.tbl_sensor_test_status_lookup rename column sensortest_status_lookup_uid to sensor_test_status_lookup_uid;
+
+-- Modify relevant SQL function
+CREATE OR REPLACE FUNCTION fieldwork.fun_sensor_isnt_deployed(
+	thissensoruid integer,
+	thisdeploymentuid integer,
+	thiscollectiondate timestamp with time zone)
+    RETURNS boolean
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+DECLARE 
+    tabledeploymentuid integer := deployment_uid FROM fieldwork.tbl_deployment WHERE deployment_uid = thisdeploymentuid; 
+BEGIN
+IF thiscollectiondate IS NOT NULL THEN
+    RETURN TRUE;
+ELSIF tabledeploymentuid = thisdeploymentuid THEN
+    RETURN TRUE;
+ELSE RETURN(SELECT not exists (SELECT * FROM fieldwork.tbl_deployment WHERE sensor_uid = thissensoruid AND collection_dtime_est IS NULL));
+END IF;
+END;
+$BODY$;
+
+
+-- Rename UID fields
+alter table fieldwork.viw_active_deployments rename column inventory_sensors_uid to sensor_uid;
+alter table fieldwork.viw_deployment_full rename column inventory_sensors_uid to sensor_uid;
+alter table fieldwork.viw_deployment_full_cwl rename column inventory_sensors_uid to sensor_uid;
+alter table fieldwork.viw_future_deployments_full rename column inventory_sensors_uid to sensor_uid;
+alter table fieldwork.viw_inventory_sensors_full_archive rename column inventory_sensors_uid to sensor_uid;
+alter table fieldwork.viw_previous_deployments rename column inventory_sensors_uid to sensor_uid;
+alter table fieldwork.viw_deployment_full_cwl_with_baro rename column inventory_sensors_uid to sensor_uid;
+alter table fieldwork.viw_qaqc_deployments rename column inventory_sensors_uid to sensor_uid;
+alter table sensors.viw_inventory_sensors_full rename column inventory_sensors_uid to sensor_uid;
+alter table sensors.viw_sensor_tests_full rename column inventory_sensors_uid to sensor_uid;
+alter table sensors.viw_sensor_recent_tests rename column inventory_sensors_uid to sensor_uid;
+alter table sensors.viw_sensor_current_status rename column inventory_sensors_uid to sensor_uid;
+alter table sensors.viw_inventory_sensors_status rename column inventory_sensors_uid to sensor_uid;
+alter table sensors.viw_sensor_deadlines rename column inventory_sensors_uid to sensor_uid;
+alter table sensors.tbl_sensor_tests rename column inventory_sensors_uid to sensor_uid;
+alter table fieldwork.tbl_future_deployment rename column inventory_sensors_uid to sensor_uid;
+alter table fieldwork.tbl_deployment rename column inventory_sensors_uid to sensor_uid;
+alter table sensors.tbl_inventory_sensors rename column inventory_sensors_uid to sensor_uid;
+alter table fieldwork.tbl_inventory_sensors_archive rename column inventory_sensors_uid to sensor_uid;
+
