@@ -52,6 +52,33 @@ alter table if exists fieldwork.viw_sensor_current_status set schema sensors;
 -- Rename inventory table
 alter table if exists sensors.tbl_inventory_sensors rename to tbl_sensor;
 
+-- Rename sensortest status table
+alter table if exists sensors.tbl_sensortest_status_lookup rename to tbl_sensor_test_status_lookup;
+alter table if exists sensors.tbl_sensor_test_status_lookup rename column sensortest_status_lookup_uid to sensor_test_status_lookup_uid
+
+-- Modify relevant SQL function
+CREATE OR REPLACE FUNCTION fieldwork.fun_sensor_isnt_deployed(
+	thissensoruid integer,
+	thisdeploymentuid integer,
+	thiscollectiondate timestamp with time zone)
+    RETURNS boolean
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE PARALLEL UNSAFE
+AS $BODY$
+DECLARE 
+    tabledeploymentuid integer := deployment_uid FROM fieldwork.tbl_deployment WHERE deployment_uid = thisdeploymentuid; 
+BEGIN
+IF thiscollectiondate IS NOT NULL THEN
+    RETURN TRUE;
+ELSIF tabledeploymentuid = thisdeploymentuid THEN
+    RETURN TRUE;
+ELSE RETURN(SELECT not exists (SELECT * FROM fieldwork.tbl_deployment WHERE sensor_uid = thissensoruid AND collection_dtime_est IS NULL));
+END IF;
+END;
+$BODY$;
+
+
 -- Rename UID fields
 alter table fieldwork.viw_active_deployments rename column inventory_sensors_uid to sensor_uid;
 alter table fieldwork.viw_deployment_full rename column inventory_sensors_uid to sensor_uid;
