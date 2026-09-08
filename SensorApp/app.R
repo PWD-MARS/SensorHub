@@ -58,7 +58,7 @@ options(reactable.theme = reactableTheme(
 poolConn <- dbPool(RPostgres::Postgres(),
                       host = "PWDMARSDBS1.pwd.phila.local",
                       port = 5434,
-                      dbname = "mars_monica",
+                      dbname = "mars_prod",
                       user = Sys.getenv("shiny_uid"),
                       password = Sys.getenv("shiny_pwd")
 )
