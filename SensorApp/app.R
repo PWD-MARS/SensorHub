@@ -144,10 +144,10 @@ ui <- tagList(useShinyjs(), navbarPage("Sensor Hub",
             selected = NULL
           ),
           dateInput("date_purchased", "Purchase Date", value = as.Date(NA)),
-          selectInput("sensor_status", html_req("Sensor Status"), choices = sensor_status_lookup$sensor_status, selected = "Good Order"),
+          selectInput("sensor_status", html_req("Sensor Status"), choices = sensor_status_lookup$sensor_status),
           conditionalPanel(
             width = 12,
-            condition = 'input.sensor_status != "Good Order" & input.sensor_status != "In Testing"',
+            condition = 'input.sensor_status != "Good Order- MARS Custody" & input.sensor_status != "Good Order- AKRF Custody"  & input.sensor_status != "In Testing"',
             selectInput("issue_one", html_req("Issue #1"),
               choices = c("", sensor_issue_lookup$sensor_issue), selected = NULL
             ),
@@ -396,8 +396,8 @@ server <- function(input, output, session) {
   
   observeEvent(input$serial_no, {
     
-    #if input serial number is already in the list, then suggest the sensor status if it isn't already there, show "Good Order"
-    rv$sensor_status_select <- if(input$serial_no %in% rv$sensor_table$sensor_serial) dplyr::filter(rv$sensor_table, sensor_serial == input$serial_no) %>% dplyr::select(sensor_status) %>% dplyr::pull() else "Good Order"
+    #if input serial number is already in the list, then suggest the sensor status
+    rv$sensor_status_select <- if(input$serial_no %in% rv$sensor_table$sensor_serial) dplyr::filter(rv$sensor_table, sensor_serial == input$serial_no) %>% dplyr::select(sensor_status) %>% dplyr::pull() else ""
     
     updateSelectInput(session, "sensor_status", selected = rv$sensor_status_select)
     
@@ -463,7 +463,7 @@ server <- function(input, output, session) {
   
   observeEvent(input$sensor_status, {
     #if Good Order, clear issues fields 
-    if(rv$status_lookup_uid() == 1){
+    if(rv$status_lookup_uid() %in% c(1, 7)){ #Good Order - MARS or Good Order - AKRF
       reset("issue_one")
       reset("issue_two")
       reset("request_data")
@@ -479,7 +479,7 @@ server <- function(input, output, session) {
     
     if(!(input$serial_no %in% rv$sensor_table$sensor_serial)){
       add_sensor_query <- paste0(
-        "INSERT INTO sensors.tbl_inventory_sensors (sensor_serial, sensor_model_lookup_uid, date_purchased) 
+        "INSERT INTO sensors.tbl_sensor (sensor_serial, sensor_model_lookup_uid, date_purchased) 
     	      VALUES (", input$serial_no, ", ",rv$sensor_model_lookup_uid(), ", ",  
         rv$date_purchased(), ")")
       
@@ -507,7 +507,7 @@ server <- function(input, output, session) {
       })
     }else{ #edit sensor info
       
-      update_sensor_query <- paste0("UPDATE sensors.tbl_inventory_sensors SET 
+      update_sensor_query <- paste0("UPDATE sensors.tbl_sensor SET 
                                             sensor_model_lookup_uid = ", rv$sensor_model_lookup_uid(), ",
                                             date_purchased = ", rv$date_purchased(), " 
                                             WHERE sensor_serial = '", input$serial_no, "'")
@@ -736,7 +736,7 @@ server <- function(input, output, session) {
 #         dplyr::select(sensor_status_lookup_uid) %>%
 #         dplyr::pull()
 # 
-#       edt_sensor_status_q <- paste("Update sensors.tbl_inventory_sensors SET sensor_status_lookup_uid = ", sensor_status_lookup_uid, " where sensor_uid = ", inv_uid, sep = "")
+#       edt_sensor_status_q <- paste("Update sensors.tbl_sensor SET sensor_status_lookup_uid = ", sensor_status_lookup_uid, " where sensor_uid = ", inv_uid, sep = "")
 # 
 #       odbc::dbGetQuery(poolConn, edt_sensor_status_q)
 
@@ -798,7 +798,7 @@ server <- function(input, output, session) {
       odbc::dbGetQuery(poolConn, edt_sensor_test_q)
 
       # # status update
-      # edt_sensor_status_qq <- paste("Update sensors.tbl_inventory_sensors SET sensor_status_lookup_uid = ", sensor_status_lookup_uid, " where sensor_uid = ", inv_uid, sep = "")
+      # edt_sensor_status_qq <- paste("Update sensors.tbl_sensor SET sensor_status_lookup_uid = ", sensor_status_lookup_uid, " where sensor_uid = ", inv_uid, sep = "")
       # 
       # odbc::dbGetQuery(poolConn, edt_sensor_status_qq)
 
