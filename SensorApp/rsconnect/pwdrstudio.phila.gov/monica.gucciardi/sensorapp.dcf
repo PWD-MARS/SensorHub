@@ -5,7 +5,7 @@ account: monica.gucciardi
 server: pwdrstudio.phila.gov
 hostUrl: https://pwdrstudio.phila.gov/__api__
 appId: 647
-bundleId: 4705
+bundleId: 4711
 url: https://pwdrstudio.phila.gov/mars/sensorhub/
 version: 1
 asMultiple: FALSE
